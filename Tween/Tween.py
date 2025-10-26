@@ -39,6 +39,8 @@ class Tween:
         # if self.kwargs.get("tween_property"):
         #     setattr(self.target, self.kwargs['tween_property'], lerp(self.kwargs['from_'], self.kwargs['to_'], self.progress))
         if self.kwargs.get("tween_property"):
+            if self.kwargs['from_'] is None:
+                self.kwargs['from_'] = getattr(self.target, self.kwargs['tween_property'])
             setattr(self.target, self.kwargs['tween_property'], Tween.lerp(
                 self.kwargs['from_'],
                 self.kwargs['to_'],
@@ -86,7 +88,7 @@ class TweenManager:
     def __init__(self):
         self.tweens = []
 
-    def add_tween(self, target, tween_property, from_, to_, duration, on_finish: callable = None, motion: str = "ease_in_out_cubic"):
+    def add_tween(self, target, tween_property, from_ = None, to_ = None, duration = None, on_finish: callable = None, motion: str = "ease_in_out_cubic"):
         tween = Tween(target, duration, on_finish=on_finish, motion=motion, tween_property=tween_property, from_=from_, to_=to_)
         tween.start()
         self.tweens.append(tween)

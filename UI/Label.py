@@ -12,7 +12,7 @@ class Label(UIElement):
                          bg_color, fg_color, font, text, corner_radius)
 
         if font is None:
-            font = self.game.font_small
+            self.font = self.game.fonts["comfortaa"]["small"]
         else:
             self.font = font
 

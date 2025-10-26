@@ -1,16 +1,17 @@
 from functools import partial
 import time
 
+
 class Timer:
-    def __init__(self):
+    def __init__(self, dur, callback):
         """
         Initializes the Timer with default values.
         """
-        self.desired_duration = -1
+        self.desired_duration = dur if dur else -1
         self.started = False
         self.start_time = time.time()
         self.finished = False
-        self.callback = lambda: None
+        self.callback = callback
         self._has_already_executed_callback = False
 
     def set_callback(self, callback):
@@ -75,8 +76,11 @@ class Timer:
         """
         return f"[ desired_duration: {self.desired_duration} ]"
 
+
 class SpacedCallback:
-    def __init__(self, callback, interval: float, how_many_times: int = -1, *args, **kwargs):
+    def __init__(
+        self, callback, interval: float, how_many_times: int = -1, *args, **kwargs
+    ):
         """
         Initializes the SpacedCallback with the specified parameters.
 
@@ -132,13 +136,16 @@ class SpacedCallback:
         """
         return f"[ interval: {self.interval}, how_many_times: {self.how_many_times} ]"
 
+
 if __name__ == "__main__":
     t = Timer()
     x = 0
+
     def callback():
         global x
         x += 1
         print(f"Callback executed {x} times.")
+
     sc = SpacedCallback(callback, 0.5)
     sc.start()
     t.start(5)

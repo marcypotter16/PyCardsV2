@@ -1,6 +1,7 @@
 import pygame
 from pygame import Rect
 
+from Game import Game
 from Generic.Stack import Stack
 from UI.Abstract import UICanvas
 from Utils.Text import draw_centered_text
@@ -8,7 +9,7 @@ from Utils.Colors import BLACK
 
 
 class State:
-    def __init__(self, game, msg=None, layer="foreground"):
+    def __init__(self, game: Game, msg=None, layer="foreground"):
         self.game = game
         self.canvas: UICanvas = UICanvas(game)
         self.bg_color = BLACK
@@ -21,7 +22,7 @@ class State:
         surface.fill(self.bg_color)
         self.canvas.render(surface)
         if self.msg is not None:
-            draw_centered_text(self.game.font_big, surface, self.msg, (255, 255, 255), rect=Rect(
+            draw_centered_text(self.game.fonts["comfortaa"]["big"], surface, self.msg, (255, 255, 255), rect=Rect(
                 0, 0, self.game.GAME_W, self.game.GAME_H // 2
             ))
 

@@ -1,24 +1,25 @@
 import os
 
 import pygame as p
+import pygame.freetype
 import time
 
 from Generic.Stack import Stack
 from Tween.Tween import TweenManager
-
-
+from Utils.Text import draw_centered_text
 
 
 class Game:
     def __init__(self, workdir: str = os.getcwd()):
         self.need_key_event_handling = True
         self.events = None
-        self.fps: int = 60
+        self.fps: int = 120
         self.clock = p.time.Clock()
         self.font_dir = None
         self.assets_dir = None
         self.font_medium = None  # This has to be set!
         self.title_screen = None
+        self.show_stats = True
         p.init()
         p.mixer.init()
         # self.GAME_W, self.GAME_H = 640, 320
@@ -30,8 +31,18 @@ class Game:
         self.game_canvas = p.Surface((self.GAME_W, self.GAME_H))
         self.screen = p.display.set_mode((self.SCREEN_W, self.SCREEN_H))
         self.running, self.playing = True, True
-        self.actions: dict[str, int] = {'left': 0, 'right': 0, 'up': 0, 'jump': 0, 'down': 0, 'action1': 0,
-                                        'glide': 0, 'start': 0, 'mouse_sx': 0, 'mouse_dx': 0}
+        self.actions: dict[str, int] = {
+            "left": 0,
+            "right": 0,
+            "up": 0,
+            "jump": 0,
+            "down": 0,
+            "action1": 0,
+            "glide": 0,
+            "start": 0,
+            "mouse_sx": 0,
+            "mouse_dx": 0,
+        }
         self.jump_action_changed: int = 0
         self.clicked_sx: int = 0
         self.clicked_dx: int = 0
@@ -50,13 +61,10 @@ class Game:
 
         self.mousepos = None
         self.base_dir = workdir
-        try:
-            self.load_assets()
-            self.load_map()
-            self.load_states()
-            self.load_sounds()
-        except:
-            pass
+        self.load_assets()
+        self.load_map()
+        self.load_states()
+        self.load_sounds()
 
     def game_loop(self):
         while self.playing:
@@ -68,80 +76,99 @@ class Game:
 
     def get_events(self):
         self.events = p.event.get()
-        aux_prev_jump_action = self.actions['jump']
-        aux_prev_mouse_sx = self.actions['mouse_sx']
-        aux_prev_mouse_dx = self.actions['mouse_dx']
+        aux_prev_jump_action = self.actions["jump"]
+        aux_prev_mouse_sx = self.actions["mouse_sx"]
+        aux_prev_mouse_dx = self.actions["mouse_dx"]
         for event in self.events:
             if event.type == p.QUIT:
                 self.playing, self.running = False, False
 
             if event.type == p.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    self.actions['mouse_sx'] = 1
+                    self.actions["mouse_sx"] = 1
                 if event.button == 3:
-                    self.actions['mouse_dx'] = 1
+                    self.actions["mouse_dx"] = 1
 
             if event.type == p.MOUSEBUTTONUP:
                 if event.button == 1:
-                    self.actions['mouse_sx'] = 0
+                    self.actions["mouse_sx"] = 0
                 if event.button == 3:
-                    self.actions['mouse_dx'] = 0
+                    self.actions["mouse_dx"] = 0
 
             if self.need_key_event_handling:
                 if event.type == p.KEYDOWN:
                     if event.key == p.K_ESCAPE:
                         self.playing, self.running = False, False
                     if event.key == p.K_a:
-                        self.actions['left'] = 1
+                        self.actions["left"] = 1
                     if event.key == p.K_d:
-                        self.actions['right'] = 1
+                        self.actions["right"] = 1
                     if event.key == p.K_s:
-                        self.actions['down'] = 1
+                        self.actions["down"] = 1
                     if event.key == p.K_w:
-                        self.actions['up'] = 1
-                        self.actions['jump'] = 1
+                        self.actions["up"] = 1
+                        self.actions["jump"] = 1
                     if event.key == p.K_1:
-                        self.actions['action1'] = 1
+                        self.actions["action1"] = 1
                     if event.key == p.K_SPACE:
-                        self.actions['glide'] = 1
+                        self.actions["glide"] = 1
                     if event.key == p.K_3:
-                        self.actions['start'] = 1
+                        self.actions["start"] = 1
                 if event.type == p.KEYUP:
                     if event.key == p.K_a:
-                        self.actions['left'] = 0
+                        self.actions["left"] = 0
                     if event.key == p.K_d:
-                        self.actions['right'] = 0
+                        self.actions["right"] = 0
                     if event.key == p.K_s:
-                        self.actions['down'] = 0
+                        self.actions["down"] = 0
                     if event.key == p.K_w:
-                        self.actions['up'] = 0
-                        self.actions['jump'] = 0
-                        self.actions['down'] = 0
+                        self.actions["up"] = 0
+                        self.actions["jump"] = 0
+                        self.actions["down"] = 0
                     if event.key == p.K_1:
-                        self.actions['action1'] = 0
+                        self.actions["action1"] = 0
                     if event.key == p.K_SPACE:
-                        self.actions['glide'] = 0
+                        self.actions["glide"] = 0
                     if event.key == p.K_3:
-                        self.actions['start'] = 0
-            self.jump_action_changed = self.actions['jump'] - aux_prev_jump_action
-        self.clicked_sx = self.actions['mouse_sx'] - aux_prev_mouse_sx
-        self.clicked_dx = self.actions['mouse_dx'] - aux_prev_mouse_dx
+                        self.actions["start"] = 0
+            self.jump_action_changed = self.actions["jump"] - aux_prev_jump_action
+        self.clicked_sx = self.actions["mouse_sx"] - aux_prev_mouse_sx
+        self.clicked_dx = self.actions["mouse_dx"] - aux_prev_mouse_dx
         # print(self.jump_action_changed)
 
     def update(self):
         self.mousepos = (
-            p.mouse.get_pos()[0] * self.GAME_W / self.SCREEN_W, p.mouse.get_pos()[1] * self.GAME_H / self.SCREEN_H)
+            p.mouse.get_pos()[0] * self.GAME_W / self.SCREEN_W,
+            p.mouse.get_pos()[1] * self.GAME_H / self.SCREEN_H,
+        )
         # self.state_stack.top().update(self.dt, self.actions)
         self.state_stack.top().update(self.dt)
         self.tweener.update()
 
     def render(self):
         self.state_stack.top().render(self.game_canvas)
+        if self.show_stats:
+            self.print_stats(self.game_canvas)
         # for layer in self.render_stack.keys():
         #     for render_function in self.render_stack[layer]:
         #         render_function(self.game_canvas)
-        self.screen.blit(p.transform.scale(self.game_canvas, (self.SCREEN_W, self.SCREEN_H)), (0, 0))
-        p.display.flip()  # ??
+        self.screen.blit(
+            p.transform.scale(self.game_canvas, (self.SCREEN_W, self.SCREEN_H)), (0, 0)
+        )
+        p.display.flip()
+
+    def print_stats(self, surf):
+        # canvas = self.state_stack.top().canvas
+        # container = VertContainer(canvas, x=800)
+        # label = Label(container, text=f"fps: {self.fps}")
+        # container.pack()
+        rect = p.Rect((0, 0), (100, 20))
+        col = p.Color(0, 255, 0)
+        p.draw.rect(surf, col, rect, 1, 2)
+        draw_centered_text(
+            self.fonts["press_start"]["small"], surf, f"fps: {self.fps}", col, rect
+        )
+        # self.game_canvas
 
     def get_dt(self):
         now = time.time()
@@ -155,15 +182,34 @@ class Game:
         print(self.base_dir, self.assets_dir)
         # self.sprite_dir = os.path.join(self.assets_dir, "sprites")
         self.font_dir = os.path.join(self.assets_dir, "font")
-        # self.font_medium = p.font_medium.Font(os.path.join(self.font_dir, "PressStart2P-vaV7.ttf"), 20)
-        self.font_medium = p.font.Font(os.path.join(self.font_dir, "Comfortaa-Regular.ttf"), 20)
-        self.font_big = p.font.Font(os.path.join(self.font_dir, "Comfortaa-Regular.ttf"), 40)
-        self.font_small = p.font.Font(os.path.join(self.font_dir, "Comfortaa-Regular.ttf"), 10)
-        self.font_tiny = p.font.Font(os.path.join(self.font_dir, "Comfortaa-Regular.ttf"), 5)
-        # self.font_big_bold = p.font.Font(os.path.join(self.font_dir, "Comfortaa-Bold.ttf"), 40)
-        # self.font_medium_bold = p.font.Font(os.path.join(self.font_dir, "Comfortaa-Bold.ttf"), 20)
-        # self.font_small_bold = p.font.Font(os.path.join(self.font_dir, "Comfortaa-Bold.ttf"), 10)
-        # self.font_tiny_bold = p.font.Font(os.path.join(self.font_dir, "Comfortaa-Bold.ttf"), 5)
+
+        # Structured fonts dictionary - Using pygame.freetype for better antialiasing quality
+        self.fonts = {}
+
+        # Font configurations: (filename, [big, medium, small, tiny])
+        font_configs = {
+            "comfortaa": ("Comfortaa-Regular.ttf", [40, 20, 14, 10]),
+            "javier_skull": ("Javier Skull.ttf", [50, 26, 18, 12]),
+            "october_crow": ("October Crow.ttf", [50, 26, 18, 12]),
+            "press_start": ("PressStart.ttf", [30, 16, 10, 6]),
+        }
+
+        sizes = ["big", "medium", "small", "tiny"]
+
+        # Load fonts with optimized rendering settings
+        for font_name, (filename, font_sizes) in font_configs.items():
+            self.fonts[font_name] = {}
+            for i, size_name in enumerate(sizes):
+                font = pygame.freetype.Font(
+                    os.path.join(self.font_dir, filename), font_sizes[i]
+                )
+                self.fonts[font_name][size_name] = font
+
+        # Legacy properties for backward compatibility
+        self.font_medium = self.fonts["comfortaa"]["medium"]
+        self.font_big = self.fonts["comfortaa"]["big"]
+        self.font_small = self.fonts["comfortaa"]["small"]
+        self.font_tiny = self.fonts["comfortaa"]["tiny"]
 
     def load_states(self):
         # TO BE DEFINED
@@ -204,8 +250,7 @@ class Game:
             self.state_stack.pop()
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     g = Game()
     while g.running:
         g.game_loop()

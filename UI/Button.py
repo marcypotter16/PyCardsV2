@@ -24,7 +24,7 @@ class TextButton(UIElement):
         super().__init__(
             parent, x, y, center, width, height, bg_color, fg_color, font, text, corner_radius
         )
-        self.font = self.game.font_medium if font is None else font
+        self.font = self.game.fonts["comfortaa"]["medium"] if font is None else font
         self.hover_color = hover_color
         self.height = self.font.get_height() + 10
         self.command = None

@@ -7,7 +7,7 @@ from Utils import Draw
 class UICanvas:
     def __init__(self, game: Game):
         self.game = game
-        self.font = game.font_medium
+        self.font = game.fonts["comfortaa"]["medium"]
         self.y = None
         self.width = None
         self.x = None
@@ -59,7 +59,7 @@ class UIContainer(UICanvas):
         :param corner_radius: corner radius for smoothed rectangles
         """
         super().__init__(parent.game)
-        self.font = font if font is not None else self.game.font_medium
+        self.font = font if font is not None else self.game.fonts["comfortaa"]["medium"]
         self.children: list[UIContainer] = []
 
         self.parent = parent

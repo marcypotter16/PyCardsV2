@@ -1,22 +1,28 @@
+from typing import Generic, TypeVar
+
+
+T = TypeVar('T')
+
+
 class EmptyStackError(Exception):
     pass
 
 
-class Stack:
+class Stack(Generic[T]):
     def __init__(self):
-        self.stack = []
+        self.elements: list[T] = []
         self.__size = 0
 
-    def top(self):
+    def top(self) -> T:
         """
         Returns the top element of the stack
         :return:
         """
         if self.__size == 0:
             raise EmptyStackError
-        return self.stack[0]
+        return self.elements[0]
 
-    def pop(self):
+    def pop(self) -> T:
         """
         Removes the top element of the stack and returns it
         :return:
@@ -24,15 +30,15 @@ class Stack:
         if self.__size == 0:
             raise EmptyStackError
         self.__size -= 1
-        return self.stack.pop(0)
+        return self.elements.pop(0)
 
-    def push(self, obj):
+    def push(self, obj: T) -> None:
         """
         Adds an element to the top of the stack
         :param obj:
         :return:
         """
-        self.stack.insert(0, obj)
+        self.elements.insert(0, obj)
         self.__size += 1
 
     def is_empty(self) -> bool:
@@ -50,4 +56,7 @@ class Stack:
         return self.__size
     
     def __str__(self):
-        return str(self.stack)
+        return str(self.elements)
+    
+    def to_list(self) -> list[T]:
+        return self.elements
