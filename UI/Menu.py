@@ -11,7 +11,7 @@ class Menu(UIElement):
     def __init__(self, parent: UICanvas = None, x=0, y=0, center=None, width=100, height=100,
                  bg_color: tuple | str = (40, 40, 40), default: str = None,
                  fg_color=(0, 0, 0), text: str = "", corner_radius=10, options: list[str] = [""]):
-        super().__init__(parent, x, y, center, width, height, bg_color, fg_color, text, corner_radius)
+        super().__init__(parent, x, y, center, width, height, bg_color, fg_color, None, text, corner_radius)
         self.options = options
         self.options_container = UIContainer(parent=self, x=x, y=y + height, width=width, height=height*len(options), corner_radius=10)
         self.options_container.visible = False

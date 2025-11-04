@@ -1,31 +1,38 @@
-from Generic.LinkedList import MB_LL
-from Models.Transform import Transform2
-from Models.GameObject import GameObject
+from Collections.LinkedList import MB_LL
+from GameObjects.Transform import Transform2
+from GameObjects.GameObject import GameObject
 import pygame as p
 
+# from Constants import CARD_DIMENSIONS, CARD_BASE_PATH
 from Utils.Text import draw_centered_text
 
 
 class SpriteRenderer(GameObject):
     def __init__(
         self,
-        parent: GameObject,
-        image_path: str,
-        dimensions: tuple[int, int] | p.Vector2,
+        parent: GameObject = None,
+        image_path: str = None,
+        dimensions: tuple[int, int] | p.Vector2 = None,
     ):
         # super().__init__(game, parent)
         self.parent = parent
-        self.parent.children.append(self)
+        if parent is not None:
+            self.parent.children.append(self)
         self.position = p.Vector2(0, 0)
         self.__last_frame_position = p.Vector2(0, 0)
         self.transform = Transform2()
         self.TWEEN_DUR = 0.2
-        self.__o_dimensions = self.dimensions = dimensions
-        self.__o_sprite = self.sprite = p.image.load(image_path)
-        self.sprite = self.__o_sprite = p.transform.smoothscale(
-            self.sprite, self.dimensions
+        self.__o_dimensions = self.dimensions = (
+            dimensions if dimensions is not None else (10, 10)
         )
-        self.rect = p.Rect(0, 0, dimensions[0], dimensions[1])
+        self.__o_sprite = self.sprite = (
+            p.image.load(image_path) if image_path is not None else None
+        )
+        if self.sprite is not None:
+            self.sprite = self.__o_sprite = p.transform.scale(
+                self.sprite, self.dimensions
+            )
+        self.rect = p.Rect(0, 0, self.dimensions[0], self.dimensions[1])
         self.is_visible = True
         self.debug = False
         self.mb = {
@@ -38,22 +45,32 @@ class SpriteRenderer(GameObject):
         self.__stop_rotating = lambda: setattr(
             self, "_SpriteRenderer__is_rotating", False
         )
-        self.__stop_moving = lambda: setattr(self, "_SpriteRenderer__is_moving", False)
 
     def __stop_scaling(self, on_finish):
         self.__is_scaling = False
-        on_finish.__call__()
+        if on_finish:
+            on_finish.__call__()
+
+    def __stop_moving(self, on_finish):
+        self.__is_moving = False
+        if on_finish:
+            on_finish.__call__()
 
     def set_dim(self, new_dimensions: tuple[int, int]):
         self.dimensions = new_dimensions
-        self.sprite = p.transform.smoothscale(self.__o_sprite, self.dimensions)
+        if self.__o_sprite is not None:
+            self.sprite = p.transform.scale(self.__o_sprite, self.dimensions)
         self.rect.w, self.rect.h = new_dimensions
+
+    def set_sprite(self, new_sprite: p.Surface):
+        # self.__o_sprite = new_sprite
+        self.__o_sprite = self.sprite = p.transform.scale(new_sprite, self.dimensions)
 
     def scale_by(self, factor: float):
         self.transform.scale_by(factor)
         self.rect.scale_by(factor)
         self.dimensions = p.Vector2(self.dimensions) * factor
-        self.sprite = p.transform.smoothscale_by(self.__o_sprite, self.transform.scale)
+        self.sprite = p.transform.scale_by(self.__o_sprite, self.transform.scale)
 
     def move(self, new_position: tuple[int, int] | p.Vector2):
         self.transform.move(p.Vector2(new_position))
@@ -72,19 +89,19 @@ class SpriteRenderer(GameObject):
         self.rotate(angle)
         self.move(new_pos)
 
-    def tween_pos(self, new_position: tuple[int, int] | p.Vector2):
+    def tween_pos(self, new_position: tuple[int, int] | p.Vector2, on_finish=None):
         self.__is_moving = True
-        self.parent.game.tweener.add_tween(
+        self.parent.game.tweener_manager.add_tween(
             self.transform,
             "position",
             to_=p.Vector2(new_position),
             duration=self.TWEEN_DUR,
-            on_finish=self.__stop_moving,
+            on_finish=lambda: self.__stop_moving(on_finish),
         )
 
     def tween_rot(self, angle: float):
         self.__is_rotating = True
-        self.parent.game.tweener.add_tween(
+        self.parent.game.tweener_manager.add_tween(
             self.transform,
             "rotation",
             to_=angle,
@@ -92,9 +109,9 @@ class SpriteRenderer(GameObject):
             on_finish=self.__stop_rotating,
         )
 
-    def tween_scale_by(self, factor: float, on_finish=None):
+    def tween_scale_to(self, factor: float, on_finish=None):
         self.__is_scaling = True
-        self.parent.game.tweener.add_tween(
+        self.parent.game.tweener_manager.add_tween(
             self.transform,
             "scale",
             to_=factor,
@@ -121,6 +138,7 @@ class SpriteRenderer(GameObject):
                 self.__o_sprite, self.transform.rotation, self.transform.scale
             )
             self.rect.size = p.Vector2(self.__o_dimensions) * self.transform.scale
+            self.rect.center = self.transform.position
         if self.__is_moving:
             self.rect.center = self.transform.position
         self.position = p.Vector2(self.rect.center)
@@ -149,29 +167,32 @@ class SpriteRenderer(GameObject):
         # self.move(self.transform.position + p.Vector2(0.1, 0))
 
     def render(self, surf: p.surface.Surface):
-        if not self.mb["active"]:
-            surf.blit(self.sprite, self.sprite.get_rect(center=self.rect.center))
-        else:
-            # Render motion blur frames with fading alpha
-            mb_frames = self.mb_sprites.to_list()
-            for i, (sprite, rect) in enumerate(mb_frames):
-                alpha = int(255 * (1 - i / self.mb["n_frames"]))  # Fade older frames
-                sprite.set_alpha(alpha)
-                surf.blit(sprite, sprite.get_rect(center=rect.center))
-            # Render current frame on top
-            surf.blit(self.sprite, self.sprite.get_rect(center=self.rect.center))
-        if self.debug:
-            p.draw.rect(surf, p.Color(255, 0, 0), self.rect, 2)
-            p.draw.rect(
-                surf,
-                p.Color(0, 100, 200),
-                self.sprite.get_rect(center=self.rect.center),
-                2,
-            )
-            draw_centered_text(
-                self.parent.game.font_tiny,
-                surf,
-                f"mb_is_on: {self.__mb_do_it}",
-                (255, 255, 255),
-                p.Rect(20, 20, 100, 10),
-            )
+        if self.sprite is not None:
+            if not self.mb["active"]:
+                surf.blit(self.sprite, self.sprite.get_rect(center=self.rect.center))
+            else:
+                # Render motion blur frames with fading alpha
+                mb_frames = self.mb_sprites.to_list()
+                for i, (sprite, rect) in enumerate(mb_frames):
+                    alpha = int(
+                        255 * (1 - i / self.mb["n_frames"])
+                    )  # Fade older frames
+                    sprite.set_alpha(alpha)
+                    surf.blit(sprite, sprite.get_rect(center=rect.center))
+                # Render current frame on top
+                surf.blit(self.sprite, self.sprite.get_rect(center=self.rect.center))
+            if self.debug:
+                p.draw.rect(surf, p.Color(255, 0, 0), self.rect, 2)
+                p.draw.rect(
+                    surf,
+                    p.Color(0, 100, 200),
+                    self.sprite.get_rect(center=self.rect.center),
+                    2,
+                )
+                draw_centered_text(
+                    self.parent.game.font_tiny,
+                    surf,
+                    f"mb_is_on: {self.__mb_do_it}",
+                    (255, 255, 255),
+                    p.Rect(20, 20, 100, 10),
+                )

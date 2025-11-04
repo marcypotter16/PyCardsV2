@@ -3,7 +3,7 @@ import time
 
 
 class Timer:
-    def __init__(self, dur, callback):
+    def __init__(self, dur=None, callback=None):
         """
         Initializes the Timer with default values.
         """
@@ -37,7 +37,7 @@ class Timer:
             self.finished = False
             self.start_time = time.time()
 
-    def update(self, dt: float):
+    def update(self):
         """
         Updates the timer status.
 
@@ -64,7 +64,7 @@ class Timer:
         Args:
             callback (function): The callback function to execute.
         """
-        if self.finished:
+        if self.finished and self.callback is not None:
             self.callback()
 
     def __repr__(self) -> str:
@@ -95,23 +95,24 @@ class SpacedCallback:
         self.how_many_times = how_many_times
         self.last_time = time.time()
         self.executed_times = 0
-        self.is_running = False
+        self.finished = True
+        self.on_finish = None
 
     def start(self):
         """
         Starts the SpacedCallback.
         """
         self.last_time = time.time()
-        self.is_running = True
+        self.finished = False
 
-    def update(self, dt: float):
+    def update(self):
         """
         Updates the SpacedCallback status and executes the callback if the interval has passed.
 
         Args:
             dt (float): The delta time since the last update.
         """
-        if not self.is_running:
+        if self.finished:
             return
         if time.time() - self.last_time >= self.interval:
             if self.how_many_times == -1 or self.executed_times < self.how_many_times:
@@ -125,7 +126,7 @@ class SpacedCallback:
         """
         Stops the SpacedCallback.
         """
-        self.is_running = False
+        self.finished = True
 
     def __repr__(self) -> str:
         """
@@ -135,6 +136,29 @@ class SpacedCallback:
             str: The string representation of the SpacedCallback.
         """
         return f"[ interval: {self.interval}, how_many_times: {self.how_many_times} ]"
+
+
+class TimerManager:
+    def __init__(self):
+        self.timers: list[Timer | SpacedCallback] = []
+
+    def add_timer(self, timer: Timer | SpacedCallback):
+        self.timers.append(timer)
+        timer.start()
+
+    def update(self):
+        # for tween in self.tweens:
+        #     tween.update()
+        #     if tween.is_finished():
+        #         if tween.on_finish:
+        #             tween.on_finish.__call__()
+        #         self.tweens.remove(tween)
+        for timer in self.timers:
+            timer.update()
+            if timer.finished:
+                if timer.on_finish:
+                    timer.on_finish.__call__()
+                self.timers.remove(timer)
 
 
 if __name__ == "__main__":
@@ -149,6 +173,10 @@ if __name__ == "__main__":
     sc = SpacedCallback(callback, 0.5)
     sc.start()
     t.start(5)
+    tm = TimerManager()
+    tm.add_timer(t)
+    tm.add_timer(sc)
     while True:
-        t.update(0.1)
-        sc.update(0.1)
+        # tm.update()
+        t.update()
+        sc.update()

@@ -1,5 +1,5 @@
 from Game import Game
-from Models.Transform import Transform2
+from GameObjects.Transform import Transform2
 from pygame import Vector2
 
 
@@ -8,9 +8,11 @@ class GameObject:
         self.parent = parent  # None is fine
         self.game = game
         self.transform = Transform2()
-        self.parent = None
         self.children: list[GameObject] = []
+        if self.parent is not None and hasattr(self.parent, "children"):
+            self.parent.children.append(self)
         self.pivot = pivot
+        self.is_visible = True
 
     def update(self, delta):
         for c in self.children:
@@ -25,6 +27,12 @@ class GameObject:
         self.transform.move(new_position)
         for c in self.children:
             c.move(new_position)
+
+    def scale_by(self, factor):
+        self.transform.scale_by(factor)
+        for c in self.children:
+            if c.is_visible:
+                c.scale_by(factor)
 
     def rotate(self, angle):
         self.transform.set_rot(angle)

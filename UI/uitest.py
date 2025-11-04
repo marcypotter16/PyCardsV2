@@ -17,23 +17,31 @@ from Utils.Text import draw_text
 class TestState(State):
     def __init__(self, game):
         super().__init__(game)
+        self.bg_color = (40, 40, 40)  # Dark gray background for better visibility
 
     def render(self, surface):
-        super().render(surface)
-        pygame.draw.circle(surface, (255, 255, 255), self.game.mousepos, radius=5)
-        draw_text(self.game.fonts["comfortaa"]["medium"], surface, "Test State", (100, 110, 100), self.game.GAME_W / 2, 30)
-        draw_text(self.game.fonts["comfortaa"]["medium"], surface, f"{self.game.mousepos[0]}, {self.game.mousepos[1]}",
-                  color=(200, 200, 200), x=0, y=0)
+        try:
+            super().render(surface)
+            pygame.draw.circle(surface, (255, 255, 255), self.game.mousepos, radius=5)
+            draw_text(self.game.fonts["comfortaa"]["medium"], surface, "UI Test - Press ESC to quit", (100, 255, 100), self.game.GAME_W / 2 - 150, 30)
+            draw_text(self.game.fonts["comfortaa"]["medium"], surface, f"Mouse: {self.game.mousepos[0]:.0f}, {self.game.mousepos[1]:.0f}",
+                      color=(200, 200, 200), x=10, y=10)
+        except Exception as e:
+            print(f"Render error: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 class UITester:
-    def __init__(self, game: Game, elements: list[UICanvas]):
+    def __init__(self, game: Game, canvas: UICanvas):
         self.game = game
         state = TestState(self.game)
-        state.canvas = elements
+        state.canvas = canvas
         self.game.state_stack.push(state)
-        while self.game.running:
-            self.game.game_loop()
+        print(f"Game running: {self.game.running}, playing: {self.game.playing}")
+        print(f"State stack size: {self.game.state_stack.size()}")
+        self.game.game_loop()
+        print("Game loop exited")
 
     def update(self):
         self.game.update()
@@ -86,10 +94,10 @@ if __name__ == '__main__':
     psw_entry = Entry(parent=canvas, x=200, y=550, width=400, height=50, focus_color=(255, 255, 255), is_password=True)
 
     tabs: dict[str, UIContainer] = {}
-    tab1 = UIContainer(parent=canvas)
-    label1 = Label(parent=tab1, center=tab1.rect.center, fg_color=(255, 255, 255), width=300, height=50, text='Tab 1')
-    tab2 = UIContainer(parent=canvas)
-    label2 = Label(parent=tab2, center=tab1.rect.center, width=300, height=50, text='Tab 2')
+    tab1 = UIContainer(parent=canvas, x=0, y=0, width=400, height=250, bg_color=(60, 60, 60))
+    label1 = Label(parent=tab1, x=50, y=100, fg_color=(255, 255, 255), width=300, height=50, text='Tab 1')
+    tab2 = UIContainer(parent=canvas, x=0, y=0, width=400, height=250, bg_color=(60, 60, 60))
+    label2 = Label(parent=tab2, x=50, y=100, fg_color=(255, 255, 255), width=300, height=50, text='Tab 2')
     tabs['Tab one'] = tab1
     tabs['Tab two'] = tab2
     tabs_frame = TabsFrame(parent=canvas, x=700, y=500, width=400, height=300, fg_color=(255, 255, 255), tabs=tabs)
@@ -99,4 +107,4 @@ if __name__ == '__main__':
     # button2.y += 40
     # print(button)
     # print(button2)
-    ui_tester = UITester(g, [canvas])
+    ui_tester = UITester(g, canvas)

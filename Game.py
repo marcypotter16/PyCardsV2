@@ -1,16 +1,25 @@
 import os
+from typing import Dict
+
+from Resolution import set_dpi_awareness
+from Utils.Timer import SpacedCallback, Timer, TimerManager
+
+set_dpi_awareness()
 
 import pygame as p
+
+# import pygame_shaders as ps
 import pygame.freetype
 import time
 
-from Generic.Stack import Stack
+from Collections.Stack import Stack
 from Tween.Tween import TweenManager
 from Utils.Text import draw_centered_text
 
 
+# TODO: Shaders
 class Game:
-    def __init__(self, workdir: str = os.getcwd()):
+    def __init__(self, workdir: str = os.getcwd(), use_shaders: bool = False):
         self.need_key_event_handling = True
         self.events = None
         self.fps: int = 120
@@ -23,13 +32,19 @@ class Game:
         p.init()
         p.mixer.init()
         # self.GAME_W, self.GAME_H = 640, 320
-        # self.GAME_W, self.GAME_H = 1920, 1080
-        # self.SCREEN_W, self.SCREEN_H = 1920, 1080
-        self.GAME_W, self.GAME_H = 1280, 720
-        self.SCREEN_W, self.SCREEN_H = 1280, 720
+        self.GAME_W, self.GAME_H = 1920, 1080
+        self.SCREEN_W, self.SCREEN_H = 1920, 1080
+        # self.GAME_W, self.GAME_H = 1280, 720
+        # self.SCREEN_W, self.SCREEN_H = 1280, 720
         self.SCREEN_CENTER = (self.GAME_W / 2, self.GAME_H / 2)
         self.game_canvas = p.Surface((self.GAME_W, self.GAME_H))
         self.screen = p.display.set_mode((self.SCREEN_W, self.SCREEN_H))
+        self.use_shaders = use_shaders
+        self.screen_shader = (
+            ps.Shader(ps.DEFAULT_VERTEX_SHADER, "screen_frag.glsl", self.game_canvas)
+            if use_shaders
+            else None
+        )
         self.running, self.playing = True, True
         self.actions: dict[str, int] = {
             "left": 0,
@@ -49,7 +64,8 @@ class Game:
         self.dt, self.prev_time = 0, 0
         self.state_stack = Stack()
 
-        self.tweener = TweenManager()
+        self.tweener_manager: TweenManager = TweenManager()
+        self.timer_manager: TimerManager = TimerManager()
 
         # self.event_system = EventSystem()
 
@@ -143,7 +159,8 @@ class Game:
         )
         # self.state_stack.top().update(self.dt, self.actions)
         self.state_stack.top().update(self.dt)
-        self.tweener.update()
+        self.tweener_manager.update()
+        self.timer_manager.update()
 
     def render(self):
         self.state_stack.top().render(self.game_canvas)
@@ -155,6 +172,8 @@ class Game:
         self.screen.blit(
             p.transform.scale(self.game_canvas, (self.SCREEN_W, self.SCREEN_H)), (0, 0)
         )
+        if self.use_shaders:
+            self.screen_shader.render()
         p.display.flip()
 
     def print_stats(self, surf):
@@ -172,7 +191,7 @@ class Game:
 
     def get_dt(self):
         now = time.time()
-        self.dt = now - self.prev_time
+        self.dt = now - self.prev_time if self.prev_time > 0 else 0
         self.prev_time = now
 
     def load_assets(self):
@@ -184,7 +203,7 @@ class Game:
         self.font_dir = os.path.join(self.assets_dir, "font")
 
         # Structured fonts dictionary - Using pygame.freetype for better antialiasing quality
-        self.fonts = {}
+        self.fonts: Dict[str, Dict[str, pygame.freetype.Font]] = {}
 
         # Font configurations: (filename, [big, medium, small, tiny])
         font_configs = {

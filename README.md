@@ -36,7 +36,7 @@ and put it in a State
 from States.State import State
 
 class SomeState(State):
-	def __init__(self, game, msg=None, layer="foreground"):
+	def __init__(self, game, data: object | None = None, layer="foreground"):
 		super().__init__(game, msg, layer)
 
 		self.circle = Circle(self.game)

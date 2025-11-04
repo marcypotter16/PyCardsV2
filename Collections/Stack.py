@@ -1,7 +1,7 @@
 from typing import Generic, TypeVar
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class EmptyStackError(Exception):
@@ -54,9 +54,9 @@ class Stack(Generic[T]):
         :return:
         """
         return self.__size
-    
+
     def __str__(self):
         return str(self.elements)
-    
+
     def to_list(self) -> list[T]:
         return self.elements

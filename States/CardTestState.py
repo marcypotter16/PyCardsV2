@@ -1,7 +1,8 @@
 from Game import Game
-from Models.Card import Card, CardController
-from Models.Slot import SlotController
-from Models.Card2 import Card2
+
+# from GameObjects.Card import Card, CardController
+from GameObjects.Slot import SlotController
+from GameObjects.Card import Card, CardController
 from States.State import State
 import pygame as p
 
@@ -9,7 +10,7 @@ from Utils.Timer import Timer
 
 
 class CardTestState(State):
-    def __init__(self, game: Game, msg=None, layer="foreground"):
+    def __init__(self, game: Game, data: object | None = None, layer="foreground"):
         super().__init__(game, msg, layer)
         self.slot = SlotController(self.game)
         self.slot.move((1000, 200))
@@ -17,7 +18,7 @@ class CardTestState(State):
 
     def from_card(self, card: Card):
         self.card = CardController(self.game)
-        self.card2 = Card2(self.game)
+        self.card2 = CardController(self.game)
         self.card2.move(p.Vector2(100, 100))
         self.card.from_card(card)
 

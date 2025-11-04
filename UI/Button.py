@@ -1,4 +1,5 @@
 import pygame
+import pygame.freetype
 
 from UI.Abstract import UIElement, UICanvas
 from Utils.Text import draw_centered_text
@@ -22,11 +23,23 @@ class TextButton(UIElement):
         hover_color=(150, 150, 150),
     ):
         super().__init__(
-            parent, x, y, center, width, height, bg_color, fg_color, font, text, corner_radius
+            parent,
+            x,
+            y,
+            center,
+            width,
+            height,
+            bg_color,
+            fg_color,
+            font,
+            text,
+            corner_radius,
         )
-        self.font = self.game.fonts["comfortaa"]["medium"] if font is None else font
+        self.font: pygame.freetype.Font = (
+            self.game.fonts["comfortaa"]["medium"] if font is None else font
+        )
         self.hover_color = hover_color
-        self.height = self.font.get_height() + 10
+        self.height = self.font.get_sized_height() + 10
         self.command = None
         if callable(command):
             self.command = command
@@ -37,7 +50,7 @@ class TextButton(UIElement):
                 self.hover(dt)
                 # == -1 perchè voglio che il bottone sia cliccato quando rilasci il bottone del mouse
                 if self.game.clicked_sx == -1:
-                    self.clicked()
+                    self.__clicked()
             else:
                 self.unhover()
 
@@ -47,9 +60,17 @@ class TextButton(UIElement):
     def unhover(self):
         self.bg_color = self.original_bg_color
 
-    def clicked(self):
+    def __clicked(self):
         if self.command is not None:
             self.command.__call__()
+
+    def pack(self, margin=(10, 10)):
+        """Packs the button tightly to the text"""
+        # self.height = self.font.get_sized_height(self.font.size)
+        surf, rect = self.font.render(self.text)
+        self.width = rect.width + margin[0]
+        self.height = rect.height + margin[1]
+        self.rect.update(self.x, self.y, self.width, self.height)
 
     def render(self, surface: pygame.Surface):
         if self.visible:

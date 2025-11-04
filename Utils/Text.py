@@ -72,7 +72,7 @@ def draw_text_hq(font_path: str, size: int, surface: pygame.Surface, text: str,
         ft_font.render_to(surface, (x, y), text, color)
 
 
-def draw_number_with_circle_background(font: pygame.font.Font, surface: pygame.Surface, number: str,
+def draw_number_with_circle_background(font: pygame.font.Font | pygame.freetype.Font, surface: pygame.Surface, number: str,
                                        bg_color: tuple, fg_color: tuple, x: int, y: int):
     """
     Draws a number with a circle background.
@@ -85,5 +85,9 @@ def draw_number_with_circle_background(font: pygame.font.Font, surface: pygame.S
     :param y: Y of the center of the rectangle containing the text
     :return:
     """
-    draw.circle(surface, bg_color, (x + font.size(number)[0] * .5, y + font.size(number)[1] * .5), 10)
+    if isinstance(font, pygame.freetype.Font):
+        text_rect = font.get_rect(number)
+        draw.circle(surface, bg_color, (x + text_rect.width * .5, y + text_rect.height * .5), 10)
+    else:
+        draw.circle(surface, bg_color, (x + font.size(number)[0] * .5, y + font.size(number)[1] * .5), 10)
     draw_text(font, surface, str(number), fg_color, x, y)
