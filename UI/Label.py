@@ -41,6 +41,12 @@ class Label(UIElement):
         else:
             self.font = font
 
+        try:
+            self.font.render(self.text if self.text else " ")
+        except pygame.error as e:
+            print(e)
+            self.text = ""
+
         # Auto-size the label based on text if width/height not provided
         if width is None:
             surf, rect = self.font.render(self.text if self.text else " ")

@@ -4,6 +4,7 @@ import threading
 import time
 
 import pygame
+import pyperclip
 import websockets
 from Constants import get_create_room_addr, get_join_room_addr
 from PModels import PRoom
@@ -104,34 +105,55 @@ class MainMenu(State):
         )
         print(f"[{p_name}] Joining room {r_id}...")
 
+        # Initialize last_message
+        self.last_message = None
+
         # Listen for messages
-        while True:
-            message = await self.websocket.recv()
-            data = json.loads(message)
+        try:
+            while True:
+                message = await self.websocket.recv()
+                data = json.loads(message)
 
-            msg_type = data.get("type")
-            print(f"[{p_name}] {msg_type}: {data.get('message')}")
+                msg_type = data.get("type")
+                print(f"[{p_name}] {msg_type}: {data.get('message')}")
 
-            if msg_type == "room_not_found":
-                print(f"[{p_name}] Error: Room does not exist!")
-                self.res_label.text = "Error: Room does not exist!"
-                break
-            elif msg_type == "room_joined":
-                print(f"[{p_name}] Player count: {data.get('player_count')}")
-                self.res_label.text = (
-                    f"[{p_name}] Player count: {data.get('player_count')}"
-                )
-                await asyncio.sleep(2)
-                self.game.push_state(
-                    RoomState(
-                        self.game,
-                        data=PRoom(room_id=data["room_id"], players=data["players"]),
-                        websocket_ref=self,
+                if msg_type == "room_not_found":
+                    print(f"[{p_name}] Error: Room does not exist!")
+                    self.res_label.text = "Error: Room does not exist!"
+                    break
+                elif msg_type == "room_joined":
+                    print(f"[{p_name}] Player count: {data.get('player_count')}")
+                    self.res_label.text = (
+                        f"[{p_name}] Player count: {data.get('player_count')}"
                     )
-                )
+                    await asyncio.sleep(2)
+                    self.game.push_state(
+                        RoomState(
+                            self.game,
+                            data=PRoom(
+                                room_id=data["room_id"], players=data["players"]
+                            ),
+                            websocket_ref=self,
+                        )
+                    )
+                    # Continue listening after pushing RoomState
+                    # Store subsequent messages for RoomState to pick up
+                elif msg_type == "player_disconnected":
+                    print(
+                        f"[{p_name}] Remaining players: {data.get('remaining_players')}"
+                    )
 
-            elif msg_type == "player_disconnected":
-                print(f"[{p_name}] Remaining players: {data.get('remaining_players')}")
+                # Store all messages (including heartbeats) for RoomState to process
+                self.last_message = data
+        except websockets.exceptions.ConnectionClosed as e:
+            print(f"❌ Connection closed: {e}")
+            self.res_label.text = f"Disconnected: {e}"
+        except Exception as e:
+            print(f"❌ Unexpected error in connect: {e}")
+            import traceback
+
+            traceback.print_exc()
+            self.res_label.text = f"Error: {e}"
 
     async def create_room_and_listen(self):
         """Create room and keep listening for messages in the same event loop"""
@@ -204,6 +226,13 @@ class RoomState(State):
             font=self.game.font_big,
             fg_color=(255, 255, 255),
         )
+        self.btn_copy_room_id = TextButton(
+            self.canvas,
+            center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] - 20),
+            text="Copy Room id",
+            command=lambda: pyperclip.copy(self.data.room_id),
+        )
+        self.btn_copy_room_id.pack()
         self.vc_players = VertContainer(
             self.canvas,
             x=200,

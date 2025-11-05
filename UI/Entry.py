@@ -1,4 +1,5 @@
 import pygame
+import pyperclip
 
 from UI.Abstract import UIElement, UICanvas
 from Utils.Text import draw_centered_text
@@ -179,6 +180,17 @@ class Entry(UIElement):
                                     and self.text[self.caret.index_in_text] != " "
                                 ):
                                     self._hande_delete()
+
+                            if event.key == pygame.K_v:
+                                self.text = pyperclip.paste()
+                                try:
+                                    surf, rect = self.font.render(self.text)
+                                except pygame.error:
+                                    print(f"Error in rendering text: {self.text}")
+                                    self.text = ""
+                                    self.caret.reset_position()
+                                finally:
+                                    self.caret.move_to(rect.top, rect.right)
 
                         else:
                             if event.key == pygame.K_BACKSPACE:

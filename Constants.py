@@ -20,8 +20,10 @@ CARD_BASE_PATH = os.path.join(ART_PATH, "PACardBase_old.png")
 CARD_BACK_PATH = os.path.join(ART_PATH, "CardBack.png")
 
 # Multiplayer
-API_ADDR = "http://localhost:8000/"
-WS_ADDR = "ws://localhost:8000/"
+# API_ADDR = "http://localhost:8000/"
+# WS_ADDR = "ws://localhost:8000/"
+API_ADDR = "http://192.168.1.153:8000/"
+WS_ADDR = "ws://192.168.1.153:8000/"
 WS_JOIN_ROOM_BASE_ADDR = (
     WS_ADDR + "ws/matchmaking/join_room/"
 )  # Then add player_name/room_id
