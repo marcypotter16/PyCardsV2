@@ -11,9 +11,17 @@ class SpriteRenderer(GameObject):
     def __init__(
         self,
         parent: GameObject = None,
-        image_path: str = None,
+        image: p.Surface | str = None,
         dimensions: tuple[int, int] | p.Vector2 = None,
     ):
+        """
+        :param parent: The parent GameObject
+        :type parent: GameObject
+        :param image: The sprite you want to render or the full path to an image.
+        :type image: p.Surface | str
+        :param dimensions: The desired dimensions of the rendered sprite.
+        :type dimensions: tuple[int, int] | p.Vector2
+        """
         # super().__init__(game, parent)
         self.parent = parent
         if parent is not None:
@@ -25,9 +33,12 @@ class SpriteRenderer(GameObject):
         self.__o_dimensions = self.dimensions = (
             dimensions if dimensions is not None else (10, 10)
         )
-        self.__o_sprite = self.sprite = (
-            p.image.load(image_path) if image_path is not None else None
-        )
+        if isinstance(image, str):
+            self.__o_sprite = self.sprite = p.image.load(image)
+        elif isinstance(image, p.Surface):
+            self.__o_sprite = self.sprite = image
+        else:
+            self.__o_sprite = self.sprite = None
         if self.sprite is not None:
             self.sprite = self.__o_sprite = p.transform.scale(
                 self.sprite, self.dimensions
@@ -73,6 +84,7 @@ class SpriteRenderer(GameObject):
         self.sprite = p.transform.scale_by(self.__o_sprite, self.transform.scale)
 
     def move(self, new_position: tuple[int, int] | p.Vector2):
+        """Move the center of the sprite (coordinates relative to the parent, so for example (0, 0) would be the parents center) to a new position"""
         self.transform.move(p.Vector2(new_position))
         self.rect.center = p.Vector2(new_position)
 

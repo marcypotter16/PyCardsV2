@@ -5,7 +5,7 @@ import pygame
 from Constants import ART_PATH, CARD_BACK_PATH, CARD_DIMENSIONS
 from GameObjects.Card import Card
 from GameObjects.GameObject import GameObject
-from GameObjects.PlayerType import PlayerType
+from PModels import PlayerType
 from GameObjects.SpriteRenderer import SpriteRenderer
 from Utils.Text import draw_centered_text
 

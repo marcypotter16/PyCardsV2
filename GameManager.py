@@ -1,20 +1,31 @@
+from typing import Dict, List
 from Game import Game
 from GameObjects.Board import Board
-from GameObjects.Card import CardController
+from GameObjects.Card import Card, CardController
 from GameObjects.Database import CARD_DATABASE
 from GameObjects.Deck import DeckController
+from GameObjects.EffectContext import EffectContext
 from GameObjects.GameObject import GameObject
 from GameObjects.Hand import HandController
-from GameObjects.PlayerType import PlayerType
 from States.CardDetailedView import CardDetailedView
 import pygame as p
 from Tween.Tween import EasingType
-from PModels import PCardModel, Player, GameState, OmniGameState
+from PModels import (
+    EventKind,
+    PCardModel,
+    PEvent,
+    Player,
+    GameState,
+    OmniGameState,
+    PlayerType,
+)
 
 
 class GameManager(GameObject):
-    def __init__(self, game: Game):
+    def __init__(self, game: Game, players: List[Player]):
         super().__init__(game)
+        self.players = players
+        self.active_player_index = 0  # TODO: this is obviously temporary
         self.game.tweener_manager.set_tween_motion_method(EasingType.EASE_OUT_QUAD)
         self.board = Board(game, self)
         self.hand_me = HandController(
@@ -25,6 +36,7 @@ class GameManager(GameObject):
         )
         self.deck_me = DeckController(self.game, self)
         self.deck_op = DeckController(self.game, self)
+        self.history: List[PEvent] = []
         self.debug = True
         self.setup()
 
@@ -32,12 +44,18 @@ class GameManager(GameObject):
         self.hand_me.owner = PlayerType.ME
         self.hand_op.owner = PlayerType.OP
         self.board.move_center(self.game.SCREEN_CENTER)
+        self.board.grid.get(0, 0).set_available(False)
+        self.board.center_slot.set_special(True)
         self.deck_me.move((0.85 * self.game.GAME_W, 0.75 * self.game.GAME_H))
         self.deck_me.owner = PlayerType.ME
         self.deck_op.move((0.85 * self.game.GAME_W, 0.25 * self.game.GAME_H))
         self.deck_op.owner = PlayerType.OP
         self.hovered_card: CardController = None
         self.dragged_card: CardController = None
+        self.turn_count = self.ply_count = (
+            0  # ply = half turn, turn = both players played something
+        )
+        self.active_player: PlayerType = PlayerType.ME
         if self.debug:
             for _ in range(5):
                 self.hand_me.add_card(CARD_DATABASE["goth_girl"])
@@ -55,15 +73,14 @@ class GameManager(GameObject):
                 # Mouse just entered the card
                 self.hovered_card = c
                 c.hovered = True
-                c.tween_scale_to(1.5)
-                c.tween_pos(
-                    c.transform.position + c.rect.h * 0.5 * p.Vector2(0, -1), drop=False
-                )
+                target_pos = c.transform.position + c.rect.h * 0.5 * p.Vector2(0, -1)
+                c.tween_scale_to(1.5, target_card_position=target_pos)
+                c.tween_pos(target_pos, drop=False)
             elif not is_hovering and c.hovered:
                 # Mouse just left the card
                 self.hovered_card = None
                 c.hovered = False
-                c.tween_scale_to(1)
+                c.tween_scale_to(1, target_card_position=c.last_saved_pos)
                 c.snap_back()
 
     def hand_me_handle_click_sx(self, dt):
@@ -90,12 +107,18 @@ class GameManager(GameObject):
             for col in range(self.board.n_cols):
                 slot = self.board.grid.get(row, col)
                 if slot.rect.collidepoint(self.game.mousepos):
-                    self.board.play_card(self.dragged_card, row, col)
-                    self.dragged_card.tween_scale_to(1.0)
-                    # Remove card from hand
-                    if self.dragged_card in self.hand_me.cards:
-                        self.hand_me.cards.remove(self.dragged_card)
-                    card_placed = True
+                    card_placed = self.board.can_play_card(self.dragged_card, row, col)
+                    # print(f"card placed? {card_placed}")
+                    if card_placed:
+                        self.dragged_card.tween_scale_to(
+                            1.0, target_card_position=slot.rect.center
+                        )
+                        # Remove card from hand
+                        if self.dragged_card in self.hand_me.cards:
+                            self.hand_me.cards.remove(self.dragged_card)
+                            self.hand_me.reorder()
+                        # So the card is played successfully
+                        self.play_card(self.dragged_card, row, col)
                     break
             if card_placed:
                 break
@@ -105,11 +128,60 @@ class GameManager(GameObject):
 
         self.dragged_card = None
 
+    def play_card(self, card: CardController, row: int, col: int):
+        self.history.append(
+            PEvent(
+                kind=EventKind.CARD_PLAYED_FROM_HAND,
+                who_made_it=PlayerType.ME,
+                card=card.to_pydantic(),
+            )
+        )
+
+        # Trigger on_play effects with full context
+        if card.card_model.effects.get("on_play"):
+            ctx = EffectContext(
+                game_state=self.get_game_state(),
+                source_card=card,
+                board=self.board,
+                row=row,
+                col=col,
+                slot=self.board.grid.get(row, col),
+                trigger="on_play",
+            )
+            for effect in card.card_model.effects["on_play"]:
+                effect(ctx)
+
+        # Trigger effects on other cards (e.g., reactive triggers)
+        for other_card in self.board.cards:
+            if other_card.card_model.effects.get("trigger"):
+                trigger_ctx = EffectContext(
+                    game_state=self.get_game_state(),
+                    source_card=other_card,
+                    board=self.board,
+                    trigger="trigger",
+                    # The card that was just played can be accessed if needed
+                    target_card=card,
+                    row=row,
+                    col=col,
+                )
+                for effect in other_card.card_model.effects["trigger"]:
+                    effect(trigger_ctx)
+
+        self.board.play_card(card, row, col)
+        self.active_player = (
+            PlayerType.ME if self.active_player == PlayerType.OP else PlayerType.ME
+        )
+        self.active_player_index += 1
+        self.active_player_index %= 2
+        self.ply_count += 1
+        if self.active_player_index == 0:
+            self.turn_count += 1
+
     def update(self, dt):
         super().update(dt)
         # self.handle_hands(dt)
 
-        # Debug: Press 'P' to print game state as JSON
+        # Debug: Press '1' to print game state as JSON
         if self.game.actions.get("action1") == 1:
             print("\n=== GAME STATE (Player View) ===")
             print(self.export_state_json(omni=False))
@@ -155,8 +227,12 @@ class GameManager(GameObject):
         cards_in_deck_me = []
 
         return GameState(
-            turn_count=0,  # TODO: Implement turn counter
+            turn_count=self.turn_count,
+            current_turn_player_id=self.players[
+                self.active_player_index
+            ].player_id,  # TODO: do this
             cards_in_hand_me=cards_in_hand_me,
+            history=self.history,
             cards_in_board=cards_in_board,
             cards_in_gy_me=cards_in_gy_me,
             cards_in_gy_op=cards_in_gy_op,

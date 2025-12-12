@@ -1,5 +1,4 @@
 import pygame
-import pygame.freetype
 
 from UI.Abstract import UIElement, UICanvas
 from Utils.Text import draw_centered_text
@@ -35,24 +34,25 @@ class TextButton(UIElement):
             text,
             corner_radius,
         )
-        self.font: pygame.freetype.Font = (
+        self.font: pygame.font.Font = (
             self.game.fonts["comfortaa"]["medium"] if font is None else font
         )
         self.hover_color = hover_color
-        self.height = self.font.get_sized_height() + 10
+        self.height = self.font.get_height() + 10
         self.command = None
         if callable(command):
             self.command = command
 
     def update(self, dt):
         if self.visible:
-            if self.rect.collidepoint(self.game.mousepos):
-                self.hover(dt)
-                # == -1 perchè voglio che il bottone sia cliccato quando rilasci il bottone del mouse
-                if self.game.clicked_sx == -1:
-                    self.__clicked()
-            else:
-                self.unhover()
+            if self.interactable:
+                if self.rect.collidepoint(self.game.mousepos):
+                    self.hover(dt)
+                    # == -1 perchè voglio che il bottone sia cliccato quando rilasci il bottone del mouse
+                    if self.game.clicked_sx == -1:
+                        self.__clicked()
+                else:
+                    self.unhover()
 
     def hover(self, dt):
         self.bg_color = self.hover_color
@@ -66,8 +66,10 @@ class TextButton(UIElement):
 
     def pack(self, margin=(10, 10)):
         """Packs the button tightly to the text"""
-        # self.height = self.font.get_sized_height(self.font.size)
-        surf, rect = self.font.render(self.text)
+        # self.height = self.font.get_height()
+        # print(self.text)
+        surf = self.font.render(self.text, True, (255, 255, 255))
+        rect = surf.get_rect()
         self.width = rect.width + margin[0]
         self.height = rect.height + margin[1]
         self.rect.update(self.x, self.y, self.width, self.height)
@@ -120,8 +122,10 @@ class ImageButton(TextButton):
             command,
             hover_color,
         )
-        # self.animation = [pygame.transform.scale(image, self.rect.size) for image in hover_animation]
-        self.animation = hover_animation
+        self.animation = [
+            pygame.transform.smoothscale(image, self.rect.size)
+            for image in hover_animation
+        ]
 
         if mouse_pressed_image is not None:
             self.mouse_pressed_image = pygame.transform.scale(
@@ -134,10 +138,8 @@ class ImageButton(TextButton):
         self.current_image: pygame.image = self.animation[0]
         self.animation_list_length: int = len(hover_animation)
         self.prev_timestamp: float = 0
-        self._MS_BETWEEN_ANIMATION_FRAMES: float = self.game.fps / animation_fps
-        # dt = 1 / fps => se voglio avere 5 frames al secondo, supponendo di avere 60 fps => dt = 0.016, allora
-        # 5 frames al secondo vuol dire far passare 60/5 * dt = 12 * dt secondi.
-        # Quindi _S_BETWEEN_ANIMATION_FRAMES = self.game.fps / animation_fps.
+        # Time in seconds between animation frames
+        self._SECONDS_BETWEEN_FRAMES: float = 1.0 / animation_fps
 
     def update(self, dt):
         # print(self.current_image_index)
@@ -158,7 +160,7 @@ class ImageButton(TextButton):
 
     def hover(self, dt):
         self.prev_timestamp += dt
-        if self.prev_timestamp >= self._MS_BETWEEN_ANIMATION_FRAMES * dt:
+        if self.prev_timestamp >= self._SECONDS_BETWEEN_FRAMES:
             self.current_image_index = (
                 self.current_image_index + 1
             ) % self.animation_list_length

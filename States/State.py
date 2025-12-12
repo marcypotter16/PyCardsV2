@@ -9,7 +9,7 @@ from Utils.Colors import BLACK
 
 
 class State:
-    def __init__(self, game: Game, data: object | None, layer="foreground"):
+    def __init__(self, game: Game, data: object | None = None, layer="foreground"):
         """@param data: gets passed by the parent State"""
         self.game = game
         self.canvas: UICanvas = UICanvas(game)

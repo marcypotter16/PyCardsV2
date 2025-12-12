@@ -24,9 +24,11 @@ class GameObject:
                 c.render(surface)
 
     def move(self, new_position):
-        self.transform.move(new_position)
         for c in self.children:
-            c.move(new_position)
+            c.move(
+                c.transform.position + new_position - self.transform.position
+            )  # Take into account the offset between parent and child
+        self.transform.move(new_position)  # This HAS to be done after the for loop
 
     def scale_by(self, factor):
         self.transform.scale_by(factor)

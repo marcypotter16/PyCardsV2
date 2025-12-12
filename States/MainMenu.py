@@ -1,24 +1,27 @@
-import asyncio
-import json
-import threading
-import time
-
 import pygame
 import pyperclip
-import websockets
-from Constants import get_create_room_addr, get_join_room_addr
+from typing import Dict, List, Callable
 from PModels import PRoom
 from States.State import State
 from UI.Containers import VertContainer
 from UI.Label import Label
 from UI.Entry import Entry
 from UI.Button import TextButton
+from SocketManager import SocketManager
 
 
 class MainMenu(State):
     def __init__(self, game, data: object | None = None, layer="foreground"):
         super().__init__(game, data, layer)
-        self.websocket: websockets.ClientConnection = None
+        self.local_testing = True
+
+        # Use SocketManager for all websocket operations
+        self.socket_manager = SocketManager(local_testing=self.local_testing)
+
+        # Thread-safe things
+        self.pending_actions: List[Callable] = []
+
+        # UI
         self.ipt_p_name = Entry(
             self.canvas,
             center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] - 80),
@@ -45,6 +48,7 @@ class MainMenu(State):
             height=100,
             width=1000,
             fg_color=(255, 255, 255),
+            text="Join a room or create one!",
         )
         self.btn_connect = TextButton(
             self.canvas,
@@ -72,136 +76,95 @@ class MainMenu(State):
         self.btn_enqueue.pack()
 
     def _on_connect_clicked(self):
-        """Wrapper to run the async connect method in a background thread"""
-        thread = threading.Thread(
-            target=lambda: asyncio.run(
-                self.connect(self.ipt_p_name.text, self.ipt_r_id.text)
-            )
+        """Connect to a room using SocketManager"""
+        if not self.ipt_p_name.text or not self.ipt_r_id.text:
+            self.res_label.set_text("Please enter both name and room ID!")
+            return
+
+        self.res_label.set_text(f"Connecting as {self.ipt_p_name.text}...")
+        self.socket_manager.connect(
+            self.ipt_p_name.text,
+            self.ipt_r_id.text,
+            on_error=lambda e: self.res_label.set_text(f"Error: {e}"),
         )
-        thread.daemon = True  # Thread will terminate when main program exits
-        thread.start()
 
     def _on_create_clicked(self):
-        thread = threading.Thread(
-            target=lambda: asyncio.run(self.create_room_and_listen())
+        """Create a room using SocketManager"""
+        if not self.ipt_p_name.text:
+            self.res_label.set_text("Please enter your name!")
+            return
+
+        self.res_label.set_text(f"Creating room as {self.ipt_p_name.text}...")
+        self.socket_manager.create_room(
+            self.ipt_p_name.text,
+            on_error=lambda e: self.res_label.set_text(f"Error: {e}"),
         )
-        thread.daemon = True  # Thread will terminate when main program exits
-        thread.start()
 
     def _on_join_queue_clicked(self):
         pass
 
-    async def connect(self, p_name, r_id):
-        if not p_name or not r_id:
-            raise ValueError("You have to insert a name and a room id!")
-        self.res_label.text = f"Connecting as {p_name} to room {r_id}..."
-        jra = get_join_room_addr(p_name, r_id)
-        self.res_label.text += f"\nJra={jra}"
-        # async with websockets.connect(jra) as websocket:
-        self.websocket = await websockets.connect(
-            jra,
-            ping_interval=20,  # Send ping every 20 seconds
-            ping_timeout=10,  # Wait 10 seconds for pong
-        )
-        print(f"[{p_name}] Joining room {r_id}...")
+    def update(self, delta_time):
+        super().update(delta_time)
 
-        # Initialize last_message
-        self.last_message = None
+        # Execute pending actions (like pushing RoomState)
+        if self.pending_actions:
+            print(f"[MainMenu] Executing {len(self.pending_actions)} pending actions")
+            for action in self.pending_actions:
+                action()
+            self.pending_actions.clear()
 
-        # Listen for messages
-        try:
-            while True:
-                message = await self.websocket.recv()
-                data = json.loads(message)
+        # Process messages from SocketManager
+        if not self.socket_manager.messages.is_empty():
+            data = self.socket_manager.messages.pop()  # Use pop to consume the message
+            msg_type = data.get("type")
 
-                msg_type = data.get("type")
-                print(f"[{p_name}] {msg_type}: {data.get('message')}")
+            if msg_type == "room_not_found":
+                self.res_label.set_text("Error: Room does not exist!")
 
-                if msg_type == "room_not_found":
-                    print(f"[{p_name}] Error: Room does not exist!")
-                    self.res_label.text = "Error: Room does not exist!"
-                    break
-                elif msg_type == "room_joined":
-                    print(f"[{p_name}] Player count: {data.get('player_count')}")
-                    self.res_label.text = (
-                        f"[{p_name}] Player count: {data.get('player_count')}"
+            elif msg_type == "room_joined":
+                self.res_label.set_text(
+                    f"Joined room! Player count: {data.get('player_count')}"
+                )
+                # Push RoomState via pending actions to avoid threading issues
+                room_data = PRoom(
+                    room_id=data["room_id"],
+                    host_id=data.get("host_id", ""),
+                    players=data["players"],
+                )
+                self.pending_actions.append(
+                    lambda rd=room_data: self.game.push_state(
+                        RoomState(self.game, data=rd, parent_ref=self)
                     )
-                    await asyncio.sleep(2)
-                    self.game.push_state(
-                        RoomState(
-                            self.game,
-                            data=PRoom(
-                                room_id=data["room_id"], players=data["players"]
-                            ),
-                            websocket_ref=self,
-                        )
+                )
+
+            elif msg_type == "room_created":
+                self.res_label.set_text(f"Room created! ID: {data['room_id']}")
+                # Push RoomState for the newly created room
+                room_data = PRoom(
+                    room_id=data["room_id"],
+                    host_id=data.get("host_id", self.socket_manager.player_id),
+                    players=data.get("players", [self.ipt_p_name.text]),
+                )
+                self.pending_actions.append(
+                    lambda rd=room_data: self.game.push_state(
+                        RoomState(self.game, data=rd, parent_ref=self)
                     )
-                    # Continue listening after pushing RoomState
-                    # Store subsequent messages for RoomState to pick up
-                elif msg_type == "player_disconnected":
-                    print(
-                        f"[{p_name}] Remaining players: {data.get('remaining_players')}"
-                    )
+                )
 
-                # Store all messages (including heartbeats) for RoomState to process
-                self.last_message = data
-        except websockets.exceptions.ConnectionClosed as e:
-            print(f"❌ Connection closed: {e}")
-            self.res_label.text = f"Disconnected: {e}"
-        except Exception as e:
-            print(f"❌ Unexpected error in connect: {e}")
-            import traceback
+            elif msg_type == "player_disconnected":
+                print(
+                    f"[MainMenu] Player disconnected. Remaining: {data.get('remaining_players')}"
+                )
 
-            traceback.print_exc()
-            self.res_label.text = f"Error: {e}"
+            elif msg_type == "connection_closed":
+                self.res_label.set_text(
+                    f"Connection closed: {data.get('reason', 'Unknown')}"
+                )
 
-    async def create_room_and_listen(self):
-        """Create room and keep listening for messages in the same event loop"""
-        if not self.ipt_p_name.text:
-            raise ValueError("You have to insert a name!")
-        self.res_label.text = f"Creating lobby as {self.ipt_p_name.text}"
-        cra = get_create_room_addr(self.ipt_p_name.text)
-        self.res_label.text += f"\nJra={cra}"
-
-        self.websocket = await websockets.connect(
-            cra,
-            ping_interval=20,  # Send ping every 20 seconds
-            ping_timeout=10,  # Wait 10 seconds for pong
-        )
-
-        # Wait for room creation confirmation
-        msg = await self.websocket.recv()
-        data = json.loads(msg)
-        print(data)
-        self.res_label.text = f"Created room with id: {data['room_id']}"
-
-        # Push the RoomState but DON'T pass the websocket yet
-        data["p_name"] = self.ipt_p_name.text
-        data["players"] = [self.ipt_p_name.text]
-        data2 = PRoom(room_id=data["room_id"], players=data["players"])
-        self.game.push_state(RoomState(self.game, data=data2, websocket_ref=self))
-
-        # Initialize last_message
-        self.last_message = None
-
-        # Now keep listening for messages in this same event loop
-        try:
-            while True:
-                print(f"[Room {data['room_id']}] Waiting for message...")
-                msg = await self.websocket.recv()
-                message_data = json.loads(msg)
-                print(f"[Room {data['room_id']}] Received: {message_data}")
-                # Store the message for the RoomState to pick up
-                self.last_message = message_data
-        except websockets.exceptions.ConnectionClosed as e:
-            print(f"❌ Connection closed: {e}")
-            self.res_label.text = f"Disconnected: {e}"
-        except Exception as e:
-            print(f"❌ Unexpected error in create_room_and_listen: {e}")
-            import traceback
-
-            traceback.print_exc()
-            self.res_label.text = f"Error: {e}"
+            elif msg_type == "error":
+                self.res_label.set_text(
+                    f"Error: {data.get('message', 'Unknown error')}"
+                )
 
     def render(self, surface):
         super().render(surface)
@@ -209,12 +172,14 @@ class MainMenu(State):
 
 class RoomState(State):
     def __init__(
-        self, game, data: PRoom = None, layer="foreground", websocket_ref=None
+        self,
+        game,
+        data: PRoom = None,
+        layer="foreground",
+        parent_ref: MainMenu = None,
     ):
         super().__init__(game, data, layer)
-        self.websocket_ref = (
-            websocket_ref  # Reference to MainMenu that owns the websocket
-        )
+        self.parent_ref = parent_ref  # Reference to MainMenu that owns the websocket
         self.data = data
         # self.room_id = data.get("room_id")
         # self.p_name = data.get("p_name")
@@ -254,15 +219,57 @@ class RoomState(State):
             self.vc_players.add_child(
                 Label(self.vc_players, text=p_id, fg_color=(255, 255, 255))
             )
+        self.vc_players.pack("vert")
+
+        self.btn_start_game = None
+        # Check if this player is the host using SocketManager
+        if self.parent_ref.socket_manager.is_host():
+            self.btn_start_game = TextButton(
+                self.canvas,
+                center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] + 20),
+                text="Start game",
+                command=self.start_game,
+            )
+            self.btn_start_game.pack()
+            self.btn_start_game.toggle_interactable()
+
+    def start_game(self):
+        """Send a request to the server to start the game"""
+        # Only the host can request to start the game
+        print(self.parent_ref.socket_manager.player_id, self.data.host_id)
+        if not self.parent_ref.socket_manager.is_host():
+            print("[RoomState] Only the host can start the game!")
+            return
+
+        # Send the request to the server - server will validate and broadcast
+        print("[RoomState] Requesting to start game...")
+        self.parent_ref.socket_manager.send_sync(
+            {"type": "start_game_request", "room_id": self.data.room_id}
+        )
 
     def update(self, dt):
         """Check for new messages from the websocket thread"""
         super().update(dt)
-        if self.websocket_ref and hasattr(self.websocket_ref, "last_message"):
-            msg = self.websocket_ref.last_message
+        if (
+            len(self.vc_players.children) == 2
+            and self.btn_start_game
+            and not self.btn_start_game.interactable
+        ):
+            self.btn_start_game.interactable = True
+        elif (
+            len(self.vc_players.children) < 2
+            and self.btn_start_game
+            and self.btn_start_game.interactable
+        ):
+            self.btn_start_game.interactable = False
+        # Process messages from SocketManager
+        if self.parent_ref and not self.parent_ref.socket_manager.messages.is_empty():
+            msg = self.parent_ref.socket_manager.messages.pop()
             if msg:
-                self.lab_console.text = str(msg)
-                if msg["type"] == "room_joined":
+                self.lab_console.set_text(str(msg))
+                msg_type = msg.get("type")
+
+                if msg_type == "room_joined":
                     # Clear and rebuild player list
                     self.vc_players.clear()
                     for player_id in msg["players"]:
@@ -273,15 +280,44 @@ class RoomState(State):
                                 fg_color=(255, 255, 255),
                             )
                         )
+                    self.vc_players.pack()
                     print(
-                        f"RoomState: Updated player list with {len(msg['players'])} players"
+                        f"[RoomState] Updated player list with {len(msg['players'])} players"
                     )
 
-                # Clear the message so it doesn't get processed again
-                self.websocket_ref.last_message = None
+                elif msg_type == "player_disconnected":
+                    # Remove disconnected player from the list
+                    for i, c in enumerate(self.vc_players.children):
+                        if c.text == msg.get("disconnected_player"):
+                            self.vc_players.children.pop(i)
+                            self.vc_players.pack()
+                            break
+                    print(
+                        f"[RoomState] Player disconnected: {msg.get('disconnected_player')}"
+                    )
 
-                # Process the message as needed
-                print(f"RoomState received: {msg}")
+                elif msg_type == "game_started":
+                    # Server authorized the game start - transition to game state
+                    print("[RoomState] Game starting!")
+                    from States.GameManagerTestState import OnlineGameManagerTestState
+
+                    self.game.push_state(
+                        OnlineGameManagerTestState(
+                            self.game,
+                            data={
+                                "socket_manager": self.parent_ref.socket_manager,
+                            },
+                        )
+                    )
+
+                elif msg_type == "error":
+                    # Server rejected the request
+                    error_msg = msg.get("message", "Unknown error")
+                    print(f"[RoomState] Error from server: {error_msg}")
+                    self.lab_console.set_text(f"Error: {error_msg}")
+
+                # Log the message
+                print(f"[RoomState] Received: {msg}")
 
     def render(self, surface):
         super().render(surface)

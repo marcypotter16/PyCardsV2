@@ -1,5 +1,6 @@
 import pygame as p
 
+
 class Transform2:
     def __init__(self):
         self.position: p.Vector2 = p.Vector2(0, 0)
@@ -17,3 +18,6 @@ class Transform2:
 
     def move(self, new_position: p.Vector2):
         self.position = new_position
+
+    def move_by(self, vector: p.Vector2):
+        self.position += vector

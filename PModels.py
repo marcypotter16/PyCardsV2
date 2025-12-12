@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -8,7 +9,8 @@ class PCardModel(BaseModel):
     base_power: int
     current_power: int
     description: Optional[str] = None
-    owner: int  # 0 for ME, 1 for OP
+    tags: Optional[List[str]] = []
+    owner: str  # me or op
     dead: bool = False
     banished: bool = False
 
@@ -24,12 +26,29 @@ class Player(BaseModel):
     is_turn: bool = False
 
 
+class PlayerType(StrEnum):
+    ME = "me"
+    OP = "op"
+
+
+class EventKind(StrEnum):
+    CARD_PLAYED_FROM_HAND = "card_played_from_hand"
+    CARD_DRAWN_FROM_DECK = "card_drawn_from_deck"
+
+
+class PEvent(BaseModel):
+    kind: EventKind
+    who_made_it: PlayerType
+    card: PCardModel
+
+
 class GameState(BaseModel):
     """Current state of an active game"""
 
-    room_id: str
-    players: List[Player]
+    room_id: Optional[str] = None
+    players: Optional[List[Player]] = None
     current_turn_player_id: str
+    history: List[PEvent]
     game_started: bool = False
     game_finished: bool = False
     winner_id: Optional[str] = None
@@ -50,4 +69,5 @@ class PRoom(BaseModel):
     """To manage lobbies"""
 
     room_id: str
+    host_id: str
     players: List[str]  # ids

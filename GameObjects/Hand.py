@@ -5,7 +5,7 @@ import pygame as p
 
 from GameObjects.Card import Card, CardController
 from GameObjects.GameObject import GameObject
-from GameObjects.PlayerType import PlayerType
+from PModels import PlayerType
 
 
 class HandFullError(IndexError):

@@ -2,6 +2,7 @@ import os
 from typing import Dict
 
 from Resolution import set_dpi_awareness
+from SocketManager import SocketManager
 from Utils.Timer import SpacedCallback, Timer, TimerManager
 
 set_dpi_awareness()
@@ -9,7 +10,6 @@ set_dpi_awareness()
 import pygame as p
 
 # import pygame_shaders as ps
-import pygame.freetype
 import time
 
 from Collections.Stack import Stack
@@ -29,11 +29,15 @@ class Game:
         self.font_medium = None  # This has to be set!
         self.title_screen = None
         self.show_stats = True
+
+        self.socket_manager: SocketManager = SocketManager()
+
         p.init()
         p.mixer.init()
         # self.GAME_W, self.GAME_H = 640, 320
         self.GAME_W, self.GAME_H = 1920, 1080
         self.SCREEN_W, self.SCREEN_H = 1920, 1080
+        # self.SCREEN_W, self.SCREEN_H = 2500, 1600
         # self.GAME_W, self.GAME_H = 1280, 720
         # self.SCREEN_W, self.SCREEN_H = 1280, 720
         self.SCREEN_CENTER = (self.GAME_W / 2, self.GAME_H / 2)
@@ -202,8 +206,8 @@ class Game:
         # self.sprite_dir = os.path.join(self.assets_dir, "sprites")
         self.font_dir = os.path.join(self.assets_dir, "font")
 
-        # Structured fonts dictionary - Using pygame.freetype for better antialiasing quality
-        self.fonts: Dict[str, Dict[str, pygame.freetype.Font]] = {}
+        # Structured fonts dictionary - Using pygame.font.Font
+        self.fonts: Dict[str, Dict[str, p.font.Font]] = {}
 
         # Font configurations: (filename, [big, medium, small, tiny])
         font_configs = {
@@ -215,13 +219,11 @@ class Game:
 
         sizes = ["big", "medium", "small", "tiny"]
 
-        # Load fonts with optimized rendering settings
+        # Load fonts
         for font_name, (filename, font_sizes) in font_configs.items():
             self.fonts[font_name] = {}
             for i, size_name in enumerate(sizes):
-                font = pygame.freetype.Font(
-                    os.path.join(self.font_dir, filename), font_sizes[i]
-                )
+                font = p.font.Font(os.path.join(self.font_dir, filename), font_sizes[i])
                 self.fonts[font_name][size_name] = font
 
         # Legacy properties for backward compatibility

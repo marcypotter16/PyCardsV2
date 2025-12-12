@@ -1,5 +1,7 @@
 import pygame
 
+from Game import Game
+from States.State import State
 from UI.Abstract import UIElement, UICanvas
 from Utils.Text import draw_centered_text
 
@@ -41,21 +43,22 @@ class Label(UIElement):
         else:
             self.font = font
 
-        try:
-            self.font.render(self.text if self.text else " ")
-        except pygame.error as e:
-            print(e)
-            self.text = ""
+        # try:
+        #     self.font.render(self.text if self.text else " ")
+        # except pygame.error as e:
+        #     print(f"Label render error during init: text='{self.text}', error={e}")
+        #     self.text = ""
 
         # Auto-size the label based on text if width/height not provided
         if width is None:
-            surf, rect = self.font.render(self.text if self.text else " ")
+            surf = self.font.render(self.text if self.text else " ", True, (255, 255, 255))
+            rect = surf.get_rect()
             self.width = self.rect.width = rect.width + 20
         else:
             self.width = self.rect.width = width
 
         if height is None:
-            self.height = self.rect.height = self.font.get_sized_height() + 10
+            self.height = self.rect.height = self.font.get_height() + 10
         else:
             self.height = self.rect.height = height
 
@@ -66,101 +69,69 @@ class Label(UIElement):
             self.rect.center = center
             self.x, self.y = self.rect.x, self.rect.y
 
-    # def _wrap_text(self, text: str, max_width: int) -> list[str]:
-    #     """
-    #     Wraps text to fit within max_width, breaking at word boundaries.
-    #     Returns a list of lines.
-    #     """
-    #     words = text.split(' ')
-    #     lines = []
-    #     current_line = []
+        self.lines = [""]
+        self.set_text(self.text)
 
-    #     for word in words:
-    #         # Try adding this word to the current line
-    #         test_line = ' '.join(current_line + [word])
-    #         text_width = self.font.get_rect(test_line).width
+    def set_text(self, new_text: str):
+        try:
+            surf = self.font.render(new_text, True, (255, 255, 255))
+            self.text = new_text
+            self.lines = self._wrap_text()
+            # print(self.text, self.lines)
+        except:
+            print(f"Label set_text error")
 
-    #         if text_width <= max_width:
-    #             # Word fits, add it to current line
-    #             current_line.append(word)
-    #         else:
-    #             # Word doesn't fit
-    #             if current_line:
-    #                 # Save current line and start new one with this word
-    #                 lines.append(' '.join(current_line))
-    #                 current_line = [word]
-    #             else:
-    #                 # Single word is too long, add it anyway
-    #                 lines.append(word)
-    #                 current_line = []
+    def _wrap_text(self, max_width: int = None) -> list[str]:
+        """
+        Wraps text to fit within max_width, breaking at word boundaries.
+        Returns a list of lines.
+        """
+        max_width = max_width if max_width else self.rect.width
+        words = self.text.split()
+        lines = []
+        current_line = []
 
-    #     # Add remaining words
-    #     if current_line:
-    #         lines.append(' '.join(current_line))
+        for word in words:
+            # Try adding this word to the current line
+            test_line = " ".join(current_line + [word])
+            text_width = self.font.size(test_line)[0]
 
-    #     return lines if lines else ['']
+            if text_width <= max_width:
+                # Word fits, add it to current line
+                current_line.append(word)
+            else:
+                # Word doesn't fit
+                if current_line:
+                    # Save current line and start new one with this word
+                    lines.append(" ".join(current_line))
+                    current_line = [word]
+                else:
+                    # Single word is too long, add it anyway
+                    lines.append(word)
+                    current_line = []
+
+        # Add remaining words
+        if current_line:
+            lines.append(" ".join(current_line))
+
+        return lines if lines else [""]
 
     def render(self, surface: pygame.Surface):
         super().render(surface)
-
-        # First split by explicit newlines
-        paragraphs = self.text.split("\n")
-        all_lines = paragraphs
-
-        # Add some padding to prevent text from touching edges
-        # max_width = self.rect.width - 10  # 5px padding on each side
-
-        # # Process each paragraph with word wrap
-        # for paragraph in paragraphs:
-        #     if paragraph:  # Skip empty lines
-        #         wrapped_lines = self._wrap_text(paragraph, max_width)
-        #         all_lines.extend(wrapped_lines)
-        #     else:
-        #         all_lines.append('')  # Preserve empty lines from \n\n
-
-        # If we have multiple lines, render them
-        if len(all_lines) > 1 or "\n" in self.text:
-            line_height = self.font.get_sized_height()
-            total_height = line_height * len(all_lines)
-
-            # Calculate starting Y position to center all lines vertically
-            start_y = self.rect.centery - (total_height / 2)
-
-            # Render each line
-            for i, line in enumerate(all_lines):
-                # Create a rect for this line
-                line_rect = pygame.Rect(
-                    self.rect.x,
-                    start_y + (i * line_height),
-                    self.rect.width,
-                    line_height,
-                )
-                draw_centered_text(self.font, surface, line, self.fg_color, line_rect)
-        else:
-            # Single line text - check if it needs wrapping
-            text_width = self.font.get_rect(self.text).width
-
-            # if text_width > max_width:
-            #     # Text is too long, wrap it
-            #     wrapped_lines = self._wrap_text(self.text, max_width)
-            #     line_height = self.font.get_sized_height()
-            #     total_height = line_height * len(wrapped_lines)
-            #     start_y = self.rect.centery - (total_height / 2)
-
-            #     for i, line in enumerate(wrapped_lines):
-            #         line_rect = pygame.Rect(
-            #             self.rect.x,
-            #             start_y + (i * line_height),
-            #             self.rect.width,
-            #             line_height,
-            #         )
-            #         draw_centered_text(
-            #             self.font, surface, line, self.fg_color, line_rect
-            #         )
-            # else:
-            #     # Text fits, render normally
+        # Render each line
+        # print(self.lines)
+        if len(self.lines) == 1:
             draw_centered_text(self.font, surface, self.text, self.fg_color, self.rect)
+            return
+        for i, line in enumerate(self.lines):
+            surf = self.font.render(line, True, self.fg_color)
+            rect = surf.get_rect()
+            line_y = self.rect.y + i * rect.height
+            line_rect = pygame.Rect(self.rect.x, line_y, rect.w, rect.h)
 
+            # print(line_rect)
+            pygame.draw.rect(surface, (0, 255, 0), line_rect, width=1)
+            surface.blit(surf, line_rect)
             if self.underline:
                 pygame.draw.rect(
                     surface,
@@ -174,3 +145,60 @@ class Label(UIElement):
                     border_radius=int(self.rect.h * 0.05),
                 )
         pygame.draw.rect(surface, (255, 0, 0), self.rect, width=1)
+
+
+def _wrap_text(font, text, max_width: int = None) -> list[str]:
+    """
+    Wraps text to fit within max_width, breaking at word boundaries.
+    Returns a list of lines.
+    """
+    max_width = max_width if max_width else 200
+    words = text.split()
+    lines = []
+    current_line = []
+
+    for word in words:
+        # Try adding this word to the current line
+        test_line = " ".join(current_line + [word])
+        text_width = font.size(test_line)[0]
+
+        if text_width <= max_width:
+            # Word fits, add it to current line
+            current_line.append(word)
+        else:
+            # Word doesn't fit
+            if current_line:
+                # Save current line and start new one with this word
+                lines.append(" ".join(current_line))
+                current_line = [word]
+            else:
+                # Single word is too long, add it anyway
+                lines.append(word)
+                current_line = []
+
+    # Add remaining words
+    if current_line:
+        lines.append(" ".join(current_line))
+
+    return lines if lines else [""]
+
+
+if __name__ == "__main__":
+    pygame.init()
+    font = pygame.font.SysFont("consolas", 20)
+    text = "The brown fox jumps over the lazy dog. Zio pera"
+    print(_wrap_text(font, text, 100))
+    print(_wrap_text(font, text, 200))
+    g = Game()
+    s = State(g)
+    l = Label(
+        s.canvas,
+        center=g.SCREEN_CENTER,
+        width=100,
+        height=20,
+        text=text,
+        fg_color=(255, 255, 255),
+    )
+    g.push_state(s)
+    while g.running:
+        g.game_loop()

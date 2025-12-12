@@ -4,7 +4,10 @@ from States.CardDetailedView import CardDetailedView
 from States.DeckTestState import DeckTestState
 from States.BoardTestState import BoardTestState
 from States.CardTestState import CardTestState
-from States.GameManagerTestState import GameManagerTestState
+from States.GameManagerTestState import (
+    OfflineGameManagerTestState,
+    OnlineGameManagerTestState,
+)
 from States.HandTestState import HandTestState
 from States.MainMenu import MainMenu
 from States.PauseTestState import PauseTestState
@@ -16,10 +19,12 @@ g: Game = Game()
 # c.from_card(CARD_DATABASE["goth_girl"])
 # c.card.move(g.SCREEN_CENTER)
 # c = HandTestState(g)
-# c = GameManagerTestState(g)
+# c = OnlineGameManagerTestState(g)
+c = OfflineGameManagerTestState(g)
 # c = WheelTestState(g)
 # c = PauseTestState(g)
 # c = CardDetailedView(g)
-c = MainMenu(g)
+# c = MainMenu(g)
+# c.local_testing = True
 g.load_state(c)
 g.game_loop()

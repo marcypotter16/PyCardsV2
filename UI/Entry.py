@@ -105,7 +105,8 @@ class Entry(UIElement):
                 border_radius=self.corner_radius,
             )
             text = "*" * len(self.text) if self.is_password else self.text
-            draw_centered_text(self.font, surface, text, self.fg_color, self.rect)
+            if text:  # Only draw if there's text to display
+                draw_centered_text(self.font, surface, text, self.fg_color, self.rect)
 
             # Render caret
             self.caret.render(surface)
@@ -184,12 +185,13 @@ class Entry(UIElement):
                             if event.key == pygame.K_v:
                                 self.text = pyperclip.paste()
                                 try:
-                                    surf, rect = self.font.render(self.text)
+                                    surf = self.font.render(self.text, True, (255, 255, 255))
+                                    rect = surf.get_rect()
                                 except pygame.error:
                                     print(f"Error in rendering text: {self.text}")
                                     self.text = ""
                                     self.caret.reset_position()
-                                finally:
+                                else:
                                     self.caret.move_to(rect.top, rect.right)
 
                         else:
@@ -225,7 +227,8 @@ class Entry(UIElement):
                         self.key_pressed_timer.stop()
 
     def pack(self):
-        surf, rect = self.font.render(self.text)
+        surf = self.font.render(self.text, True, (255, 255, 255))
+        rect = surf.get_rect()
         center = self.rect.center
         self.rect.size = rect.size
         self.rect.center = center
@@ -261,7 +264,7 @@ class Entry(UIElement):
         self.key_pressed = pygame.K_DELETE
 
     def _handle_printable(self, char):
-        if self.font.get_rect(self.text).width <= self.width - 40:
+        if self.font.size(self.text)[0] <= self.width - 40:
             aux_text = list(self.text)
             aux_text.insert(self.caret.index_in_text, char)
             self.text = "".join(aux_text)
@@ -320,13 +323,13 @@ class Paragraph(Entry):
             is_password,
         )
 
-        self.lines = ["" for _ in range(height // self.font.get_sized_height())]
+        self.lines = ["" for _ in range(height // self.font.get_height())]
         self.line_index = 0
-        self.line_height = self.font.get_sized_height()
+        self.line_height = self.font.get_height()
 
     def _handle_printable(self, char):
         txt = self.lines[self.line_index]
-        if self.font.get_rect(txt).width <= self.width - 40:
+        if self.font.size(txt)[0] <= self.width - 40:
             aux_text = list(txt)
             aux_text.insert(self.caret.index_in_text, char)
             self.lines[self.line_index] = "".join(aux_text)
@@ -404,39 +407,39 @@ class Caret:
         self.offset = pygame.Vector2(
             (
                 self.parent.rect.width * 0.5
-                + self.font.get_rect(self.parent.text).width * 0.5,
-                (self.parent.rect.h - self.font.get_sized_height()) * 0.5 - 3,
+                + self.font.size(self.parent.text)[0] * 0.5,
+                (self.parent.rect.h - self.font.get_height()) * 0.5 - 3,
             )
         )
 
         self.topleft: pygame.Vector2 = self.parent.rect.topleft + self.offset
         self.rect = pygame.Rect(
-            self.topleft, (2, self.parent.font.get_sized_height() + 6)
+            self.topleft, (2, self.parent.font.get_height() + 6)
         )
         self.index_in_text = len(self.parent.text)
 
     def add_char(self, char):
-        self.topleft += pygame.Vector2(self.parent.font.get_rect(char).width * 0.5, 0)
+        self.topleft += pygame.Vector2(self.parent.font.size(char)[0] * 0.5, 0)
         self.rect.update(self.topleft, self.rect.size)
         self.index_in_text += 1
 
     def remove_char(self, char):
-        self.topleft -= pygame.Vector2(self.parent.font.get_rect(char).width * 0.5, 0)
+        self.topleft -= pygame.Vector2(self.parent.font.size(char)[0] * 0.5, 0)
         self.rect.topleft = self.topleft
         self.index_in_text -= 1
 
     def delete_char(self, char):
         # We don't need to move the caret to the left because the character after the caret will be deleted
-        self.topleft += pygame.Vector2(self.parent.font.get_rect(char).width * 0.5, 0)
+        self.topleft += pygame.Vector2(self.parent.font.size(char)[0] * 0.5, 0)
         self.rect.topleft = self.topleft
 
     def shift_char_right(self, char):
-        self.topleft += pygame.Vector2(self.parent.font.get_rect(char).width, 0)
+        self.topleft += pygame.Vector2(self.parent.font.size(char)[0], 0)
         self.rect.topleft = self.topleft
         self.index_in_text += 1
 
     def shift_char_left(self, char):
-        self.topleft -= pygame.Vector2(self.parent.font.get_rect(char).width, 0)
+        self.topleft -= pygame.Vector2(self.parent.font.size(char)[0], 0)
         self.rect.topleft = self.topleft
         self.index_in_text -= 1
 

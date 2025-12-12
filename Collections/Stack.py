@@ -5,12 +5,22 @@ T = TypeVar("T")
 
 
 class EmptyStackError(Exception):
-    pass
+    def __init__(self, *args):
+        super().__init__(*args)
+
+
+class NegativeCapacityError(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)
 
 
 class Stack(Generic[T]):
-    def __init__(self):
+    def __init__(self, capacity=0):
+        """Creates a Stack of elements of type T. If capacity is unset it stores an indefinite amount of elements, else if an element is added after the capacity is reached, the element is added and the last element of the stack is erased"""
+        if capacity < 0:
+            raise NegativeCapacityError
         self.elements: list[T] = []
+        self.capacity = capacity
         self.__size = 0
 
     def top(self) -> T:
@@ -38,8 +48,12 @@ class Stack(Generic[T]):
         :param obj:
         :return:
         """
-        self.elements.insert(0, obj)
-        self.__size += 1
+        if self.capacity == 0 or self.__size < self.capacity:
+            self.elements.insert(0, obj)
+            self.__size += 1
+        else:
+            self.elements.pop(-1)
+            self.elements.insert(0, obj)
 
     def is_empty(self) -> bool:
         """
@@ -54,6 +68,13 @@ class Stack(Generic[T]):
         :return:
         """
         return self.__size
+
+    def clear(self) -> None:
+        """
+        Clears the stack
+        """
+        self.elements.clear()
+        self.__size = 0
 
     def __str__(self):
         return str(self.elements)

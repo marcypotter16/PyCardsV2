@@ -5,6 +5,7 @@ import pygame as p
 import pygame.freetype
 
 from UI.Button import TextButton
+from UI.Label import Label
 
 
 class CardDetailedView(State):
@@ -15,9 +16,10 @@ class CardDetailedView(State):
         layer="foreground",
         card=CARD_DATABASE["goth_girl"],
     ):
-        super().__init__(game, msg, layer)
+        super().__init__(game, data, layer)
         self.card_data = card
         self.card = CardController(self.game, self)
+        self.card.from_card(card)
         self.card.scale_by(0)
         self.card.move((self.game.GAME_W * 0.25, self.game.GAME_H * 0.5))
         self.font = self.game.fonts["october_crow"]["medium"]
@@ -41,6 +43,32 @@ class CardDetailedView(State):
             corner_radius=2,
             command=self.game.pop_state,
         )
+        r = p.Rect(self.game.GAME_W * 0.6, 30, self.game.GAME_W * 0.5, 60)
+        self.lab_title = Label(
+            self.canvas,
+            center=r.center,
+            width=r.w,
+            height=r.h,
+            fg_color=(255, 255, 255),
+            text=self.card_data.name,
+            font=self.game.fonts["october_crow"]["big"],
+        )
+        self.lab_desc = Label(
+            self.canvas,
+            center=p.Vector2(r.center) + p.Vector2(0, 100),
+            width=r.w,
+            height=r.height,
+            fg_color=(255, 255, 255),
+            text=self.card_data.description,
+        )
+        self.lab_tags = Label(
+            self.canvas,
+            center=p.Vector2(r.center) + p.Vector2(0, 400),
+            width=r.w,
+            height=r.h,
+            fg_color=(255, 255, 255),
+            text=str(self.card_data.tags),
+        )
         # self.text_surf = self.font.render("AABBCCddeeff", True, self.text_color)
         # self.text_surf.set_alpha(0)
 
@@ -50,27 +78,11 @@ class CardDetailedView(State):
 
     def render(self, surface):
         super().render(surface)
-        self.font.render_to(
-            surface,
-            self.game.SCREEN_CENTER,
-            str(self.card_data.uid),
-            (255, 255, 255, self.text_alpha),
-        )
         self.card.render(surface)
-        # draw_centered_text(self.game.fonts["javier_skull"]["huge"], surface, self.card_data.name, self.text_color)
-        r = p.Rect(self.game.GAME_W * 0.6, 30, self.game.GAME_W * 0.5, 60)
-        # p.draw.rect(surface, self.text_color, r, 1)
-        self.game.fonts["october_crow"]["big"].render_to(
-            surface,
-            r,
-            self.card_data.name,
-            self.text_color,
-            style=pygame.freetype.STYLE_OBLIQUE | pygame.freetype.STYLE_WIDE,
-        )
         # Separator
         p.draw.rect(
             surface,
             (100, 100, 100),
-            p.Rect(self.game.GAME_W * 0.5, 100, self.game.GAME_W * 0.4, 6),
+            p.Rect(self.game.GAME_W * 0.5, 100, self.game.GAME_W * 0.45, 4),
             border_radius=3,
         )

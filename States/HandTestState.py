@@ -6,7 +6,7 @@ from Utils.Timer import SpacedCallback
 
 class HandTestState(State):
     def __init__(self, game, data: object | None = None, layer="foreground"):
-        super().__init__(game, msg, layer)
+        super().__init__(game, data, layer)
         self.hand = HandController(self.game, center=self.game.SCREEN_CENTER)
         # spaced_call = SpacedCallback(self.spawn_and_add_card_to_hand, interval=1)
         spaced_call = SpacedCallback(self.spawn_and_add_card_to_hand, 1)

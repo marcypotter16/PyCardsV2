@@ -1,5 +1,4 @@
 import pygame
-import pygame.freetype
 
 from Game import Game
 from Utils import Draw
@@ -8,9 +7,7 @@ from Utils import Draw
 class UICanvas:
     def __init__(self, game: Game):
         self.game = game
-        self.font: pygame.font.Font | pygame.freetype.Font = game.fonts["comfortaa"][
-            "medium"
-        ]
+        self.font: pygame.font.Font = game.fonts["comfortaa"]["medium"]
         self.y = None
         self.width = None
         self.x = None
@@ -136,7 +133,11 @@ class UIContainer(UICanvas):
                 ui_element.update(dt)
 
     def pack(
-        self, side: str, padx: int = 0, pady: int = 0, modify_dimensions_to_fit=True
+        self,
+        side: str = "vert",
+        padx: int = 0,
+        pady: int = 0,
+        modify_dimensions_to_fit=True,
     ):
         """
         Makes the children fit nicely inside the parent. Width or Height might get modified to fit in the frame.
@@ -153,19 +154,19 @@ class UIContainer(UICanvas):
         s = side.lower()
         if s == "vert":
             # Not very stonks
-            self.parent.height = (
-                sum(child.height + pady for child in self.parent.children) + pady
-            )
-            self.x = self.parent.x + padx
-            if modify_dimensions_to_fit:
-                self.width = self.parent.width - 2 * padx
-            if len(self.parent.children) > 1:
-                # This now should work fine
-                last_child = self.parent.children[-2]  # -1 is the current element
-                self.y = last_child.y + last_child.height + pady
-            else:
-                self.y = self.parent.y + pady
+            self.height = sum(child.height + pady for child in self.children) + pady
+            for i, c in enumerate(self.children):
+                c.x = self.x + padx
+                if modify_dimensions_to_fit:
+                    c.width = self.width - 2 * padx
+                if i > 0:
+                    last_child = self.children[i - 1]
+                    c.y = last_child.y + last_child.height + pady
+                else:
+                    c.y = self.y + pady
+                c.rect.update(c.x, c.y, c.width, c.height)
 
+        # TODO: rewrite
         elif s == "horiz":
             # Not very stonks
             self.parent.width = (
@@ -180,9 +181,6 @@ class UIContainer(UICanvas):
                 self.x = self.parent.x + padx
 
         self.rect.update(self.x, self.y, self.width, self.height)
-        self.parent.rect.update(
-            self.parent.x, self.parent.y, self.parent.width, self.parent.height
-        )
 
     def clear(self):
         self.children.clear()
