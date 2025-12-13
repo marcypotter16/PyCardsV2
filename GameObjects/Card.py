@@ -107,9 +107,9 @@ class CardController(GameObject):
 
     def flip(self):
         self.face_up = not self.face_up
-        self.back_sprite.set_visible(self.face_up)
-        self.art_sprite.set_visible(not self.face_up)
-        self.base_sprite.set_visible(not self.face_up)
+        self.back_sprite.set_visible(not self.face_up)
+        self.art_sprite.set_visible(self.face_up)
+        self.base_sprite.set_visible(self.face_up)
 
     def tween_pos(self, pos, drop=True):
         self.game.tweener_manager.add_tween(

@@ -1,4 +1,6 @@
+from threading import Timer
 from typing import Dict, List
+from Bot import Bot
 from Game import Game
 from GameObjects.Board import Board
 from GameObjects.Card import Card, CardController
@@ -56,9 +58,17 @@ class GameManager(GameObject):
             0  # ply = half turn, turn = both players played something
         )
         self.active_player: PlayerType = PlayerType.ME
+        self.opponent_card_in_progress = (
+            False  # Track if opponent is currently playing a card
+        )
         if self.debug:
-            for _ in range(5):
-                self.hand_me.add_card(CARD_DATABASE["goth_girl"])
+            for _ in range(15):
+                self.deck_me.add_card(CARD_DATABASE["goth_girl"])
+                self.deck_op.add_card(CARD_DATABASE["goth_girl"])
+            for i in range(5):
+                self.hand_me.add_card(self.deck_me.get_and_remove_top_card())
+                self.hand_op.add_card(self.deck_op.get_and_remove_top_card())
+                # self.hand_op.cards[i].flip()
 
     # Hands
     def handle_hands(self, dt):
@@ -102,6 +112,10 @@ class GameManager(GameObject):
             c.update(dt)
 
     def process_card_release(self):
+        if self.active_player == PlayerType.OP:
+            self.dragged_card.snap_back()
+            self.dragged_card = None
+            return
         card_placed = False
         for row in range(self.board.n_rows):
             for col in range(self.board.n_cols):
@@ -169,13 +183,53 @@ class GameManager(GameObject):
 
         self.board.play_card(card, row, col)
         self.active_player = (
-            PlayerType.ME if self.active_player == PlayerType.OP else PlayerType.ME
+            PlayerType.ME if self.active_player == PlayerType.OP else PlayerType.OP
         )
+        # print(f"Now active player: {self.active_player}")
         self.active_player_index += 1
         self.active_player_index %= 2
         self.ply_count += 1
         if self.active_player_index == 0:
             self.turn_count += 1
+
+    def play_op_card(self, card: Card, row: int, col: int):
+        """I think it's fine that locally we don't know our opponent's hand"""
+        print(
+            f"[DEBUG] play_op_card called - card: {card.name}, row: {row}, col: {col}"
+        )
+        print(f"[DEBUG] opponent hand size: {len(self.hand_op.cards)}")
+
+        if self.opponent_card_in_progress:
+            print("[DEBUG] Opponent card already in progress, ignoring this call")
+            return
+
+        if len(self.hand_op.cards) == 0:
+            print("[ERROR] Opponent hand is empty! Cannot play card.")
+            return
+
+        self.opponent_card_in_progress = True
+        c = self.hand_op.cards[0]
+        print(f"[DEBUG] Selected card from opponent hand: {c.name}")
+        c.from_card(card)
+        c.tween_scale_to(1.5, p.Vector2(self.game.GAME_W * 0.75, 120))
+        c.tween_pos(p.Vector2(self.game.GAME_W * 0.75, 120))
+        c.flip()
+
+        def move_c_to_board(card_controller: CardController):
+            print(
+                f"[DEBUG] Timer callback - moving {card_controller.name} to board at ({row}, {col})"
+            )
+            # Remove the card from the hand before playing it
+            if card_controller in self.hand_op.cards:
+                self.hand_op.cards.remove(card_controller)
+                self.hand_op.reorder()
+            self.play_card(card_controller, row, col)
+            self.opponent_card_in_progress = False
+            print("[DEBUG] Card played, opponent_card_in_progress reset to False")
+
+        t = Timer(5, lambda: move_c_to_board(c))
+        t.start()
+        print(f"[DEBUG] Timer started for {c.name}")
 
     def update(self, dt):
         super().update(dt)
@@ -286,3 +340,10 @@ class GameManager(GameObject):
 
     def render(self, surface):
         super().render(surface)
+
+
+class OfflineGameManager(GameManager):
+    def __init__(self, game, players):
+        super().__init__(game, players)
+        self.bot = Bot()
+        self.bot.hand = [c.card_model for c in self.hand_op.cards]

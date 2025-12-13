@@ -16,16 +16,16 @@ class DeckFullError(IndexError):
 
 
 class DeckController(GameObject):
-    def __init__(self, game, parent=None, pivot=...):
+    def __init__(self, game, parent=None, capacity=30, pivot=...):
         super().__init__(game, parent, pivot)
         self.cards: list[Card] = []
         self.sprites: list[SpriteRenderer] = [
             SpriteRenderer(self, CARD_BACK_PATH, CARD_DIMENSIONS) for _ in range(5)
         ]
-        self.capacity = 10
+        self.capacity = capacity
         self.max_sprite_rotation = 8
         self._init_sprites()
-        print([sprite.transform.rotation for sprite in self.sprites])
+        # print([sprite.transform.rotation for sprite in self.sprites])
         self.card_count = 0
         self.text_color = pygame.Color(255, 255, 255)
         self.owner: int = PlayerType.ME
@@ -35,6 +35,11 @@ class DeckController(GameObject):
             raise DeckFullError("Trying to add a card to a full deck")
         self.cards.append(card)
         self.card_count += 1
+
+    def get_and_remove_top_card(self) -> Card:
+        card = self.cards.pop()
+        self.card_count -= 1
+        return card
 
     def _init_sprites(self):
         for sprite in self.sprites:
