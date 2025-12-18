@@ -76,7 +76,7 @@ class Menu(UIElement):
 
     def option_selected_event_handler(self):
         for button in self.buttons:
-            if button.rect.collidepoint(self.game.mousepos):
+            if button.rect.collidepoint(self.game.cursorpos):
                 self.selected_option = button.text
                 self.close_menu()
 
@@ -99,7 +99,7 @@ class Menu(UIElement):
             child.update(dt)
         # al momento del rilascio del bottone del mouse
         if self.game.clicked_sx == -1:
-            if self.rect.collidepoint(self.game.mousepos):
+            if self.rect.collidepoint(self.game.cursorpos):
                 if self.open:
                     self.close_menu()
                 else:

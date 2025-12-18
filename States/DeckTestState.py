@@ -7,7 +7,7 @@ class DeckTestState(State):
     def __init__(self, game, data: object | None = None, layer="foreground"):
         super().__init__(game, msg, layer)
         self.deck = DeckController(self.game, self)
-        self.deck.move(self.game.SCREEN_CENTER)
+        self.deck.move(self.game.GAME_CENTER)
         for _ in range(10):
             self.deck.add_card(CARD_DATABASE["goth_girl"])
 

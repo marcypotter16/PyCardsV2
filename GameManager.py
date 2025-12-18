@@ -1,21 +1,31 @@
+import random
 from threading import Timer
 from typing import Dict, List
 from Bot import Bot
 from Game import Game
 from GameObjects.Board import Board
-from GameObjects.Card import Card, CardController
+from GameObjects.Card import (
+    Card,
+    CardController,
+    CardControllerBase,
+    ChangeRingCardController,
+    SpellCardController,
+)
 from GameObjects.Database import CARD_DATABASE
 from GameObjects.Deck import DeckController
 from GameObjects.EffectContext import EffectContext
 from GameObjects.GameObject import GameObject
+from GameObjects.Graveyard import GraveyardController
 from GameObjects.Hand import HandController
+from GameObjects.MathRing import Ring, RingController
+from States.GraveyardViewState import GraveyardViewState
 from States.CardDetailedView import CardDetailedView
 import pygame as p
 from Tween.Tween import EasingType
 from PModels import (
     EventKind,
     PCardModel,
-    PEvent,
+    PHistoryEvent,
     Player,
     GameState,
     OmniGameState,
@@ -31,29 +41,35 @@ class GameManager(GameObject):
         self.game.tweener_manager.set_tween_motion_method(EasingType.EASE_OUT_QUAD)
         self.board = Board(game, self)
         self.hand_me = HandController(
-            self.game, self, center=(self.game.SCREEN_CENTER[0], self.game.GAME_H)
+            self.game,
+            self,
+            center=(self.game.GAME_CENTER[0], self.game.GAME_H),
         )
         self.hand_op = HandController(
-            self.game, self, center=(self.game.SCREEN_CENTER[0], 0)
+            self.game, self, center=(self.game.GAME_CENTER[0], 0)
         )
         self.deck_me = DeckController(self.game, self)
         self.deck_op = DeckController(self.game, self)
-        self.history: List[PEvent] = []
+        self.gy = GraveyardController(self.game, self)
+        self.ring = RingController(self.game, self)
+        self.history: List[PHistoryEvent] = []
         self.debug = True
         self.setup()
 
     def setup(self):
         self.hand_me.owner = PlayerType.ME
         self.hand_op.owner = PlayerType.OP
-        self.board.move_center(self.game.SCREEN_CENTER)
-        self.board.grid.get(0, 0).set_available(False)
+        self.board.move_center(self.game.GAME_CENTER)
+        # self.board.grid.get(0, 0).set_available(False)
         self.board.center_slot.set_special(True)
         self.deck_me.move((0.85 * self.game.GAME_W, 0.75 * self.game.GAME_H))
         self.deck_me.owner = PlayerType.ME
         self.deck_op.move((0.85 * self.game.GAME_W, 0.25 * self.game.GAME_H))
         self.deck_op.owner = PlayerType.OP
-        self.hovered_card: CardController = None
-        self.dragged_card: CardController = None
+        self.gy.move((0.15 * self.game.GAME_W, 0.5 * self.game.GAME_H))
+        self.hovered_card: CardControllerBase = None
+        self.dragged_card: CardControllerBase = None
+        self._should_dragged_card_follow_mouse = True
         self.turn_count = self.ply_count = (
             0  # ply = half turn, turn = both players played something
         )
@@ -61,22 +77,35 @@ class GameManager(GameObject):
         self.opponent_card_in_progress = (
             False  # Track if opponent is currently playing a card
         )
+        self.ring.set_ring(Ring.Z)
+        self.ring.set_color(p.Color("white"))
+        self.ring.move(
+            0.5 * (self.deck_me.transform.position + self.deck_op.transform.position)
+        )
         if self.debug:
-            for _ in range(15):
-                self.deck_me.add_card(CARD_DATABASE["goth_girl"])
+            for _ in range(13):
+                self.deck_me.add_card(random.choice(list(CARD_DATABASE.values())))
                 self.deck_op.add_card(CARD_DATABASE["goth_girl"])
+            self.deck_me.add_card(CARD_DATABASE["goth_girl"])
+            self.deck_me.add_card(CARD_DATABASE["goth_girl"])
             for i in range(5):
-                self.hand_me.add_card(self.deck_me.get_and_remove_top_card())
+                self.hand_me.add_card(
+                    self.deck_me.get_and_remove_top_card(), bg_image="BG2.png"
+                )
                 self.hand_op.add_card(self.deck_op.get_and_remove_top_card())
                 # self.hand_op.cards[i].flip()
+            for card in self.deck_me.cards:
+                card.owner = PlayerType.ME
+            for card in self.deck_op.cards:
+                card.owner = PlayerType.OP
 
     # Hands
     def handle_hands(self, dt):
-        mouse_in_hand = self.hand_me.rect.collidepoint(self.game.mousepos)
+        mouse_in_hand = self.hand_me.rect.collidepoint(self.game.cursorpos)
 
         for c in self.hand_me.cards:
             # Check if mouse is hovering this specific card
-            is_hovering = mouse_in_hand and c.rect.collidepoint(self.game.mousepos)
+            is_hovering = mouse_in_hand and c.rect.collidepoint(self.game.cursorpos)
 
             # Only trigger tween when hover state changes
             if is_hovering and not c.hovered:
@@ -84,27 +113,28 @@ class GameManager(GameObject):
                 self.hovered_card = c
                 c.hovered = True
                 target_pos = c.transform.position + c.rect.h * 0.5 * p.Vector2(0, -1)
-                c.tween_scale_to(1.5, target_card_position=target_pos)
+                # c.tween_scale_to(1.5, target_card_position=target_pos)
                 c.tween_pos(target_pos, drop=False)
             elif not is_hovering and c.hovered:
                 # Mouse just left the card
                 self.hovered_card = None
                 c.hovered = False
-                c.tween_scale_to(1, target_card_position=c.last_saved_pos)
+                # c.tween_scale_to(1, target_card_position=c.last_saved_pos)
                 c.snap_back()
 
     def hand_me_handle_click_sx(self, dt):
         for c in self.hand_me.cards:
-            if c.rect.collidepoint(self.game.mousepos):
+            if c.rect.collidepoint(self.game.cursorpos):
                 print(f"Clicked sx my card: {c.name}")
                 self.dragged_card = c
                 break
 
     def hand_me_handle_click_dx(self, dt):
         for c in self.hand_me.cards:
-            if c.rect.collidepoint(self.game.mousepos):
+            if c.rect.collidepoint(self.game.cursorpos):
                 print(f"Clicked dx my card: {c.name}")
                 self.game.push_state(CardDetailedView(self.game, card=c.card_model))
+                return
 
     # BOARD
     def update_cards_in_board(self, dt):
@@ -116,17 +146,34 @@ class GameManager(GameObject):
             self.dragged_card.snap_back()
             self.dragged_card = None
             return
+        if isinstance(
+            self.dragged_card, (SpellCardController, ChangeRingCardController)
+        ):
+            self._should_dragged_card_follow_mouse = False
+            self._should_snap_back = False
+            self.dragged_card.move_percent(0.15, 0.25)
+            self.dragged_card.scale_by(2.0)
+
+            def _play_it():
+                self.play_card(self.dragged_card)
+                self.dragged_card = None
+                self._should_snap_back = True
+                self._should_dragged_card_follow_mouse = True
+
+            timer = Timer(2.0, _play_it)
+            timer.start()
+            # _play_it()
+            return
+
         card_placed = False
         for row in range(self.board.n_rows):
             for col in range(self.board.n_cols):
                 slot = self.board.grid.get(row, col)
-                if slot.rect.collidepoint(self.game.mousepos):
+                if slot.rect.collidepoint(self.game.cursorpos):
                     card_placed = self.board.can_play_card(self.dragged_card, row, col)
                     # print(f"card placed? {card_placed}")
                     if card_placed:
-                        self.dragged_card.tween_scale_to(
-                            1.0, target_card_position=slot.rect.center
-                        )
+                        self.dragged_card.tween_scale_to(1.0)
                         # Remove card from hand
                         if self.dragged_card in self.hand_me.cards:
                             self.hand_me.cards.remove(self.dragged_card)
@@ -137,39 +184,61 @@ class GameManager(GameObject):
             if card_placed:
                 break
 
-        if not card_placed:
+        if not card_placed or not self._should_snap_back:
             self.dragged_card.snap_back()
 
         self.dragged_card = None
 
-    def play_card(self, card: CardController, row: int, col: int):
+    def play_card(
+        self,
+        card: CardControllerBase,
+        row: int = None,
+        col: int = None,
+        who=PlayerType.ME,
+    ):
         self.history.append(
-            PEvent(
+            PHistoryEvent(
                 kind=EventKind.CARD_PLAYED_FROM_HAND,
-                who_made_it=PlayerType.ME,
-                card=card.to_pydantic(),
+                who_made_it=who,
+                card_id=card.uid,
+                card_name=card.name,
+                turn_number=self.turn_count,
             )
         )
 
-        # Trigger on_play effects with full context
-        if card.card_model.effects.get("on_play"):
-            ctx = EffectContext(
-                game_state=self.get_game_state(),
-                source_card=card,
-                board=self.board,
-                row=row,
-                col=col,
-                slot=self.board.grid.get(row, col),
-                trigger="on_play",
-            )
+        if isinstance(card, (SpellCardController, ChangeRingCardController)):
+            if card.card_model.effects.get("on_play"):
+                ctx = EffectContext(
+                    game_state=self.get_game_state(),
+                    source_card=card,
+                    game_manager=self,
+                    board=self.board,
+                    trigger="on_play",
+                )
             for effect in card.card_model.effects["on_play"]:
                 effect(ctx)
+        else:
+            # Trigger on_play effects with full context
+            if card.card_model.effects.get("on_play"):
+                ctx = EffectContext(
+                    game_state=self.get_game_state(),
+                    source_card=card,
+                    game_manager=self,
+                    board=self.board,
+                    row=row,
+                    col=col,
+                    slot=self.board.grid.get(row, col),
+                    trigger="on_play",
+                )
+                for effect in card.card_model.effects["on_play"]:
+                    effect(ctx)
 
         # Trigger effects on other cards (e.g., reactive triggers)
         for other_card in self.board.cards:
             if other_card.card_model.effects.get("trigger"):
                 trigger_ctx = EffectContext(
                     game_state=self.get_game_state(),
+                    game_manager=self,
                     source_card=other_card,
                     board=self.board,
                     trigger="trigger",
@@ -181,7 +250,19 @@ class GameManager(GameObject):
                 for effect in other_card.card_model.effects["trigger"]:
                     effect(trigger_ctx)
 
-        self.board.play_card(card, row, col)
+        if isinstance(card, CardController):
+            self.board.play_card(card, row, col)
+        else:
+            # Remove from hand immediately to prevent handle_hands from calling snap_back
+            if card in self.hand_me.cards:
+                self.hand_me.cards.remove(card)
+                self.hand_me.reorder()
+
+            def _on_finish():
+                print("onfinish of spell or changering")
+                self.gy.add_card(card.card_model)
+
+            card.tween_pos(self.gy.transform.position, on_finish=_on_finish)
         self.active_player = (
             PlayerType.ME if self.active_player == PlayerType.OP else PlayerType.OP
         )
@@ -194,25 +275,19 @@ class GameManager(GameObject):
 
     def play_op_card(self, card: Card, row: int, col: int):
         """I think it's fine that locally we don't know our opponent's hand"""
-        print(
-            f"[DEBUG] play_op_card called - card: {card.name}, row: {row}, col: {col}"
-        )
-        print(f"[DEBUG] opponent hand size: {len(self.hand_op.cards)}")
 
         if self.opponent_card_in_progress:
-            print("[DEBUG] Opponent card already in progress, ignoring this call")
             return
 
-        if len(self.hand_op.cards) == 0:
-            print("[ERROR] Opponent hand is empty! Cannot play card.")
-            return
+        # if len(self.hand_op.cards) == 0:
+        #     print("[ERROR] Opponent hand is empty! Cannot play card.")
+        #     return
 
         self.opponent_card_in_progress = True
         c = self.hand_op.cards[0]
         print(f"[DEBUG] Selected card from opponent hand: {c.name}")
         c.from_card(card)
-        c.tween_scale_to(1.5, p.Vector2(self.game.GAME_W * 0.75, 120))
-        c.tween_pos(p.Vector2(self.game.GAME_W * 0.75, 120))
+        c.tween_pos_and_scale(p.Vector2(self.game.GAME_W * 0.75, 120), 1.5)
         c.flip()
 
         def move_c_to_board(card_controller: CardController):
@@ -223,11 +298,11 @@ class GameManager(GameObject):
             if card_controller in self.hand_op.cards:
                 self.hand_op.cards.remove(card_controller)
                 self.hand_op.reorder()
-            self.play_card(card_controller, row, col)
+            self.play_card(card_controller, row, col, who=PlayerType.OP)
             self.opponent_card_in_progress = False
             print("[DEBUG] Card played, opponent_card_in_progress reset to False")
 
-        t = Timer(5, lambda: move_c_to_board(c))
+        t = Timer(3, lambda: move_c_to_board(c))
         t.start()
         print(f"[DEBUG] Timer started for {c.name}")
 
@@ -244,18 +319,28 @@ class GameManager(GameObject):
             print("\n")
 
         if self.game.clicked_sx == 1:
-            if self.hand_me.rect.collidepoint(self.game.mousepos):
+            if self.hand_me.rect.collidepoint(self.game.cursorpos):
                 self.hand_me_handle_click_sx(dt)
         if self.game.clicked_sx == -1:
             if self.dragged_card is not None:
                 self.process_card_release()
         if self.game.clicked_dx == -1:
-            if self.hand_me.rect.collidepoint(self.game.mousepos):
+            if self.hand_me.rect.collidepoint(self.game.cursorpos):
                 self.hand_me_handle_click_dx(dt)
+            elif self.gy.rect.collidepoint(self.game.cursorpos):
+                print(f"Clicked dx gy")
+                self.game.push_state(
+                    GraveyardViewState(
+                        self.game,
+                        {"cards": self.gy.cards},
+                        previous_state=self.game.state_stack.top(),
+                    )
+                )
         if self.dragged_card is None:
             self.handle_hands(dt)
         else:
-            self.dragged_card.move(self.game.mousepos)
+            if self._should_dragged_card_follow_mouse:
+                self.dragged_card.move(self.game.cursorpos)
         self.update_cards_in_board(dt)
         # self.board.update(dt)
 
@@ -291,6 +376,7 @@ class GameManager(GameObject):
             cards_in_gy_me=cards_in_gy_me,
             cards_in_gy_op=cards_in_gy_op,
             cards_in_deck_me=cards_in_deck_me,
+            active_ring=str(self.ring.ring),
         )
 
     def get_omni_game_state(self) -> OmniGameState:

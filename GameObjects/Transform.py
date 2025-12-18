@@ -17,7 +17,7 @@ class Transform2:
         self.scale *= factor
 
     def move(self, new_position: p.Vector2):
-        self.position = new_position
+        self.position = p.Vector2(new_position)
 
     def move_by(self, vector: p.Vector2):
         self.position += vector

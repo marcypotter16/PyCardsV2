@@ -2,8 +2,10 @@ from Collections.LinkedList import MB_LL
 from GameObjects.Transform import Transform2
 from GameObjects.GameObject import GameObject
 import pygame as p
+import io
 
 # from Constants import CARD_DIMENSIONS, CARD_BASE_PATH
+from Utils.Image import surf_from_svg
 from Utils.Text import draw_centered_text
 
 
@@ -23,9 +25,7 @@ class SpriteRenderer(GameObject):
         :type dimensions: tuple[int, int] | p.Vector2
         """
         # super().__init__(game, parent)
-        self.parent = parent
-        if parent is not None:
-            self.parent.children.append(self)
+        self.children: list[GameObject] = []
         self.position = p.Vector2(0, 0)
         self.__last_frame_position = p.Vector2(0, 0)
         self.transform = Transform2()
@@ -34,16 +34,28 @@ class SpriteRenderer(GameObject):
             dimensions if dimensions is not None else (10, 10)
         )
         if isinstance(image, str):
-            self.__o_sprite = self.sprite = p.image.load(image)
+            self.__o_sprite = self.sprite = p.image.load(image).convert_alpha()
         elif isinstance(image, p.Surface):
-            self.__o_sprite = self.sprite = image
+            self.__o_sprite = self.sprite = image.convert_alpha()
         else:
             self.__o_sprite = self.sprite = None
         if self.sprite is not None:
-            self.sprite = self.__o_sprite = p.transform.scale(
-                self.sprite, self.dimensions
-            )
+            # Use smoothscale for better quality when resizing
+            try:
+                self.sprite = self.__o_sprite = p.transform.smoothscale(
+                    self.sprite, self.dimensions
+                )
+            except ValueError:
+                # Fallback to regular scale if smoothscale fails
+                self.sprite = self.__o_sprite = p.transform.scale(
+                    self.sprite, self.dimensions
+                )
         self.rect = p.Rect(0, 0, self.dimensions[0], self.dimensions[1])
+        self.parent = parent
+        if parent is not None:
+            self.game = parent.game
+            self.parent.children.append(self)
+            self.move(self.parent.transform.position)
         self.is_visible = True
         self.debug = False
         self.mb = {
@@ -75,16 +87,61 @@ class SpriteRenderer(GameObject):
 
     def set_sprite(self, new_sprite: p.Surface):
         # self.__o_sprite = new_sprite
-        self.__o_sprite = self.sprite = p.transform.scale(new_sprite, self.dimensions)
+        # Convert to a format that supports smoothscale (24-bit or 32-bit)
+        if new_sprite.get_bitsize() not in (24, 32):
+            # Convert to RGBA format for compatibility
+            new_sprite = new_sprite.convert_alpha()
+
+        try:
+            self.__o_sprite = self.sprite = p.transform.smoothscale(
+                new_sprite, self.dimensions
+            )
+        except ValueError:
+            # Fallback to regular scale if smoothscale fails
+            self.__o_sprite = self.sprite = p.transform.scale(
+                new_sprite, self.dimensions
+            )
+
+    def set_sprite_no_scale(self, new_sprite: p.Surface):
+        self.__o_sprite = self.sprite = new_sprite
+        self.__o_dimensions = new_sprite.get_size()
+        self.dimensions = self.__o_dimensions
+        self.rect.size = self.dimensions
+        # Keep the rect centered at current position
+        self.rect.center = self.transform.position
+
+    def apply_scale(self):
+        """Apply the current transform.scale to the sprite without changing the scale value.
+        Useful after set_sprite_no_scale when you need to reapply existing scale."""
+        if self.transform.scale != 1.0:
+            self.sprite = p.transform.smoothscale_by(
+                self.__o_sprite, self.transform.scale
+            )
+            self.dimensions = p.Vector2(self.__o_dimensions) * self.transform.scale
+            self.rect.size = self.dimensions
+            self.rect.center = self.transform.position
+
+    def set_sprite_from_svg(self, svg_path: str):
+        """Load an SVG file and convert it to a pygame surface"""
+
+        # Render SVG to PNG bytes at the desired dimensions
+        self.sprite = surf_from_svg(svg_path, self.dimensions)
 
     def scale_by(self, factor: float):
         self.transform.scale_by(factor)
         self.rect.scale_by(factor)
         self.dimensions = p.Vector2(self.dimensions) * factor
-        self.sprite = p.transform.scale_by(self.__o_sprite, self.transform.scale)
+        self.sprite = p.transform.smoothscale_by(self.__o_sprite, self.transform.scale)
 
     def move(self, new_position: tuple[int, int] | p.Vector2):
         """Move the center of the sprite (coordinates relative to the parent, so for example (0, 0) would be the parents center) to a new position"""
+        if self.children:
+            for c in self.children:
+                c.move(
+                    c.transform.position
+                    + p.Vector2(new_position)
+                    - self.transform.position
+                )
         self.transform.move(p.Vector2(new_position))
         self.rect.center = p.Vector2(new_position)
 
@@ -102,6 +159,12 @@ class SpriteRenderer(GameObject):
         self.move(new_pos)
 
     def tween_pos(self, new_position: tuple[int, int] | p.Vector2, on_finish=None):
+        # Propagate to children first (like move() does)
+        if self.children:
+            for c in self.children:
+                c.tween_pos(
+                    c.transform.position + p.Vector2(new_position) - self.transform.position
+                )
         self.__is_moving = True
         self.parent.game.tweener_manager.add_tween(
             self.transform,
@@ -144,6 +207,24 @@ class SpriteRenderer(GameObject):
     def set_visible(self, visible):
         self.is_visible = visible
 
+    def change_tint(self, new_color: p.Color):
+        """Change the tint by replacing non-transparent pixels with the new color while preserving alpha"""
+        # Make a copy with the original alpha channel
+        tex = self.__o_sprite.copy().convert_alpha()
+
+        # Create a mask from the alpha channel
+        alpha = p.surfarray.array_alpha(tex).copy()
+
+        # Fill with the new color (this replaces all pixels)
+        tex.fill(new_color)
+
+        # Restore the original alpha channel
+        p.surfarray.pixels_alpha(tex)[:] = alpha
+
+        # Update the sprite
+        self.__o_sprite = tex
+        self.sprite = p.transform.scale(tex, self.dimensions)
+
     def update(self, delta: float):
         if self.__is_rotating or self.__is_scaling:
             self.sprite = p.transform.rotozoom(
@@ -175,11 +256,14 @@ class SpriteRenderer(GameObject):
 
         # Store position for next frame comparison
         self.__last_frame_position = self.position.copy()
+        if self.children:
+            for c in self.children:
+                c.update(delta)
 
         # self.move(self.transform.position + p.Vector2(0.1, 0))
 
     def render(self, surf: p.surface.Surface):
-        if self.sprite is not None:
+        if self.sprite is not None and self.is_visible:
             if not self.mb["active"]:
                 surf.blit(self.sprite, self.sprite.get_rect(center=self.rect.center))
             else:
@@ -208,3 +292,6 @@ class SpriteRenderer(GameObject):
                     (255, 255, 255),
                     p.Rect(20, 20, 100, 10),
                 )
+        if self.children:
+            for c in self.children:
+                c.render(surf)

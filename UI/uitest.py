@@ -22,7 +22,7 @@ class TestState(State):
     def render(self, surface):
         try:
             super().render(surface)
-            pygame.draw.circle(surface, (255, 255, 255), self.game.mousepos, radius=5)
+            pygame.draw.circle(surface, (255, 255, 255), self.game.cursorpos, radius=5)
             draw_text(
                 self.game.fonts["comfortaa"]["medium"],
                 surface,
@@ -34,7 +34,7 @@ class TestState(State):
             draw_text(
                 self.game.fonts["comfortaa"]["medium"],
                 surface,
-                f"Mouse: {self.game.mousepos[0]:.0f}, {self.game.mousepos[1]:.0f}",
+                f"Mouse: {self.game.cursorpos[0]:.0f}, {self.game.cursorpos[1]:.0f}",
                 color=(200, 200, 200),
                 x=10,
                 y=10,

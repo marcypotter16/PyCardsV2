@@ -8,7 +8,7 @@ class BoardTestState(State):
     def __init__(self, game, data: object | None = None, layer="foreground"):
         super().__init__(game, msg, layer)
         self.board = Board(game, self)
-        self.board.move_center(self.game.SCREEN_CENTER)
+        self.board.move_center(self.game.GAME_CENTER)
         # print(self.board)
         # for slot in self.board.grid.flatten():
         #     print(slot.transform.position)
@@ -21,7 +21,7 @@ class BoardTestState(State):
         self.board.update(delta_time)
         for s in self.board.children:
             s.highlighted = False
-            if s.rect.collidepoint(self.game.mousepos):
+            if s.rect.collidepoint(self.game.cursorpos):
                 s.highlighted = True
         # self.test_slot.update(delta_time)
 

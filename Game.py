@@ -1,7 +1,9 @@
+import math
 import os
 from typing import Dict
 
 from Resolution import set_dpi_awareness
+from Settings import GameSettings
 from SocketManager import SocketManager
 from Utils.Timer import SpacedCallback, Timer, TimerManager
 
@@ -34,15 +36,26 @@ class Game:
 
         p.init()
         p.mixer.init()
-        # self.GAME_W, self.GAME_H = 640, 320
+        file = open(os.path.join(os.getcwd(), "settings.json"), "r")
+        self.settings = GameSettings.from_json(file.read())
+        p.mouse.set_visible(self.settings.MOUSE_VISIBLE)
+        # p.mouse.set_cursor(p.cursors.diamond)
         self.GAME_W, self.GAME_H = 1920, 1080
-        self.SCREEN_W, self.SCREEN_H = 1920, 1080
-        # self.SCREEN_W, self.SCREEN_H = 2500, 1600
-        # self.GAME_W, self.GAME_H = 1280, 720
-        # self.SCREEN_W, self.SCREEN_H = 1280, 720
-        self.SCREEN_CENTER = (self.GAME_W / 2, self.GAME_H / 2)
+        self.GAME_SCREEN_RATIO = (
+            int(
+                float(self.GAME_W) / self.settings.SCREEN_W,
+            ),
+            int(float(self.GAME_H) / self.settings.SCREEN_H),
+        )
+        self.GAME_CENTER = (self.GAME_W / 2, self.GAME_H / 2)
         self.game_canvas = p.Surface((self.GAME_W, self.GAME_H))
-        self.screen = p.display.set_mode((self.SCREEN_W, self.SCREEN_H))
+        self.screen = p.display.set_mode(
+            (self.settings.SCREEN_W, self.settings.SCREEN_H), p.RESIZABLE
+        )
+        self.game_to_screen_scale: int
+        self.screen_to_game_scale: int
+        self._recompute_scaling()
+
         self.use_shaders = use_shaders
         self.screen_shader = (
             ps.Shader(ps.DEFAULT_VERTEX_SHADER, "screen_frag.glsl", self.game_canvas)
@@ -79,7 +92,7 @@ class Game:
         #  value: list of render functions to call
         self.render_stack = {"background": [], "foreground": [], "above_all": []}
 
-        self.mousepos = None
+        self.cursorpos = None
         self.base_dir = workdir
         self.load_assets()
         self.load_map()
@@ -151,15 +164,47 @@ class Game:
                         self.actions["glide"] = 0
                     if event.key == p.K_3:
                         self.actions["start"] = 0
+                if event.type == p.VIDEORESIZE:
+                    self.settings.SCREEN_W, self.settings.SCREEN_H = event.size
+                    self.screen = p.display.set_mode(event.size, p.RESIZABLE)
+                    self._recompute_scaling()
             self.jump_action_changed = self.actions["jump"] - aux_prev_jump_action
         self.clicked_sx = self.actions["mouse_sx"] - aux_prev_mouse_sx
         self.clicked_dx = self.actions["mouse_dx"] - aux_prev_mouse_dx
         # print(self.jump_action_changed)
 
+    def _recompute_scaling(self):
+        scale_x = self.settings.SCREEN_W / self.GAME_W
+        scale_y = self.settings.SCREEN_H / self.GAME_H
+        self.game_to_screen_scale = min(scale_x, scale_y)
+        self.screen_to_game_scale = 1 / self.game_to_screen_scale
+
+        self.scaled_size = (
+            int(self.GAME_W * self.game_to_screen_scale),
+            int(self.GAME_H * self.game_to_screen_scale),
+        )
+
+        self.game_canvas_offset = (
+            (self.settings.SCREEN_W - self.scaled_size[0]) // 2,
+            (self.settings.SCREEN_H - self.scaled_size[1]) // 2,
+        )
+
+        self.scaled_game_canvas = p.Surface(self.scaled_size)
+
     def update(self):
-        self.mousepos = (
-            p.mouse.get_pos()[0] * self.GAME_W / self.SCREEN_W,
-            p.mouse.get_pos()[1] * self.GAME_H / self.SCREEN_H,
+        # Convert screen mouse position to game coordinates, accounting for letterbox
+        screen_mouse = p.mouse.get_pos()
+        # Subtract letterbox offset to get position relative to game area
+        # Get position relative to scaled game area
+        relative_x = screen_mouse[0] - self.game_canvas_offset[0]
+        relative_y = screen_mouse[1] - self.game_canvas_offset[1]
+        # Clamp to scaled game bounds (0 to scaled_size)
+        relative_x = max(0, min(relative_x, self.scaled_size[0]))
+        relative_y = max(0, min(relative_y, self.scaled_size[1]))
+        # Scale to game coordinates
+        self.cursorpos = (
+            relative_x * self.screen_to_game_scale,
+            relative_y * self.screen_to_game_scale,
         )
         # self.state_stack.top().update(self.dt, self.actions)
         self.state_stack.top().update(self.dt)
@@ -170,12 +215,20 @@ class Game:
         self.state_stack.top().render(self.game_canvas)
         if self.show_stats:
             self.print_stats(self.game_canvas)
-        # for layer in self.render_stack.keys():
-        #     for render_function in self.render_stack[layer]:
-        #         render_function(self.game_canvas)
-        self.screen.blit(
-            p.transform.scale(self.game_canvas, (self.SCREEN_W, self.SCREEN_H)), (0, 0)
+        # Render cursor above everything on game canvas
+        if not self.settings.MOUSE_VISIBLE and self.cursorpos:
+            p.draw.circle(self.game_canvas, p.Color("white"), self.cursorpos, 5)
+            p.draw.circle(self.game_canvas, p.Color("black"), self.cursorpos, 8, 2)
+
+        # scale GAME → SCREEN
+        p.transform.smoothscale(
+            self.game_canvas, self.scaled_size, self.scaled_game_canvas
         )
+
+        # present
+        self.screen.fill(self.settings.LETTERBOX_COLOR)  # letterbox bars
+        self.screen.blit(self.scaled_game_canvas, self.game_canvas_offset)
+
         if self.use_shaders:
             self.screen_shader.render()
         p.display.flip()
@@ -185,11 +238,11 @@ class Game:
         # container = VertContainer(canvas, x=800)
         # label = Label(container, text=f"fps: {self.fps}")
         # container.pack()
-        rect = p.Rect((0, 0), (100, 20))
+        rect = p.Rect((0, 0), (120, 30))
         col = p.Color(0, 255, 0)
         p.draw.rect(surf, col, rect, 1, 2)
         draw_centered_text(
-            self.fonts["press_start"]["small"], surf, f"fps: {self.fps}", col, rect
+            self.fonts["ant"]["medium"], surf, f"fps: {self.fps}", col, rect
         )
         # self.game_canvas
 
@@ -215,6 +268,7 @@ class Game:
             "javier_skull": ("Javier Skull.ttf", [50, 26, 18, 12]),
             "october_crow": ("October Crow.ttf", [50, 26, 18, 12]),
             "press_start": ("PressStart.ttf", [30, 16, 10, 6]),
+            "ant": ("AntykwaTorunska-Regular.otf", [45, 25, 20, 10]),
         }
 
         sizes = ["big", "medium", "small", "tiny"]
@@ -231,6 +285,134 @@ class Game:
         self.font_big = self.fonts["comfortaa"]["big"]
         self.font_small = self.fonts["comfortaa"]["small"]
         self.font_tiny = self.fonts["comfortaa"]["tiny"]
+
+        # Store font file paths for dynamic font creation
+        self.font_paths = {
+            font_name: os.path.join(self.font_dir, filename)
+            for font_name, (filename, _) in font_configs.items()
+        }
+
+    def get_font(self, font_name: str, size: int) -> p.font.Font:
+        """Get a font at a specific pixel size, creating it dynamically if needed
+
+        Args:
+            font_name: Name of the font family (e.g., 'ant', 'comfortaa')
+            size: Font size in pixels
+
+        Returns:
+            pygame.font.Font at the requested size
+        """
+        if font_name not in self.font_paths:
+            raise ValueError(
+                f"Unknown font: {font_name}. Available fonts: {list(self.font_paths.keys())}"
+            )
+
+        return p.font.Font(self.font_paths[font_name], size)
+
+    def render_text(
+        self,
+        text: str,
+        font_name: str,
+        color: tuple | p.Color = (255, 255, 255),
+        target_width: int = None,
+        antialias: bool = True,
+        base_font_size: int = 20,
+    ) -> p.Surface:
+        """Render text at the perfect size to fit target width without rescaling
+
+        Args:
+            text: The text to render
+            font_name: Name of the font family (e.g., 'ant', 'comfortaa')
+            color: Text color as RGB tuple or pygame Color
+            target_width: Optional target width in pixels - font will be sized to fit
+            antialias: Whether to use antialiasing (default: True)
+            base_font_size: Initial font size estimate when target_width is specified
+
+        Returns:
+            pygame.Surface with rendered text at perfect size (no rescaling needed)
+        """
+        if target_width is None:
+            # No target width - just render at base size
+            font = self.get_font(font_name, base_font_size)
+            return font.render(text, antialias, color)
+
+        # Calculate exact font size to achieve target width
+        # Start with estimate
+        font = self.get_font(font_name, base_font_size)
+        test_size = font.size(text)  # More efficient than rendering
+
+        if test_size[0] > 0:
+            # Calculate perfect font size
+            actual_font_size = int(base_font_size * target_width / test_size[0])
+            font = self.get_font(font_name, actual_font_size)
+
+        # Render at perfect size - no rescaling needed!
+        return font.render(text, antialias, color)
+
+    def render_multiline_text(
+        self,
+        text: str,
+        font_name: str,
+        color: tuple | p.Color = (255, 255, 255),
+        max_width: int = 300,
+        base_font_size: int = 20,
+        antialias: bool = True,
+    ) -> p.Surface:
+        """Render text with word wrapping to fit within max_width
+
+        Args:
+            text: The text to render
+            font_name: Name of the font family
+            color: Text color
+            max_width: Maximum width in pixels before wrapping
+            base_font_size: Font size to use
+            antialias: Whether to use antialiasing
+
+        Returns:
+            pygame.Surface with wrapped text
+        """
+        font = self.get_font(font_name, base_font_size)
+        words = text.split(" ")
+        lines = []
+        current_line = []
+
+        for word in words:
+            test_line = " ".join(current_line + [word])
+            test_size = font.size(test_line)  # More efficient than rendering
+
+            if test_size[0] <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                    current_line = [word]
+                else:
+                    # Single word is too long, just add it anyway
+                    lines.append(word)
+
+        if current_line:
+            lines.append(" ".join(current_line))
+
+        # Create surface to hold all lines
+        if not lines:
+            return font.render("", antialias, color)
+
+        line_height = font.get_height()
+        total_height = line_height * len(lines)
+
+        # Find max width among all lines using size() for efficiency
+        max_line_width = max(font.size(line)[0] for line in lines)
+
+        # Create the surface with transparency
+        text_surf = p.Surface((max_line_width, total_height), p.SRCALPHA)
+        text_surf.fill((0, 0, 0, 0))
+
+        # Render each line
+        for i, line in enumerate(lines):
+            line_surf = font.render(line, antialias, color)
+            text_surf.blit(line_surf, (0, i * line_height))
+
+        return text_surf
 
     def load_states(self):
         # TO BE DEFINED

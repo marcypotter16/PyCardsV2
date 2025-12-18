@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from GameManager import GameManager
     from GameObjects.Card import CardController
     from GameObjects.Board import Board
     from GameObjects.Slot import SlotController
@@ -18,6 +19,7 @@ class EffectContext:
     game_state: "GameState"
     source_card: "CardController"
     board: "Board"
+    game_manager: Optional["GameManager"]
 
     # Position-related (for on_play, positional effects)
     row: Optional[int] = None

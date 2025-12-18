@@ -2,8 +2,10 @@ from Bot import Bot
 from GameManager import GameManager
 from PModels import Player, PlayerType
 from SocketManager import SocketManager
+from States.HistoryViewState import HistoryViewState
 from States.MainMenu import MainMenu
 from States.State import State
+from UI.Button import TextButton
 from UI.Label import Label
 
 # from Utils.Timer import Timer
@@ -11,8 +13,10 @@ from threading import Timer
 
 
 class OnlineGameManagerTestState(State):
-    def __init__(self, game, data: object | None = None, layer="foreground"):
-        super().__init__(game, data, layer)
+    def __init__(
+        self, game, data: object | None = None, layer="foreground", previous_state=None
+    ):
+        super().__init__(game, data, layer, previous_state=previous_state)
         self.gm = None
         if data:
             self.socket_manager: SocketManager = data["socket_manager"]
@@ -21,7 +25,7 @@ class OnlineGameManagerTestState(State):
         else:
             self.lab_err_no_socket = Label(
                 self.canvas,
-                center=self.game.SCREEN_CENTER,
+                center=self.game.GAME_CENTER,
                 text="Connection error, returning to main menu",
                 fg_color=(255, 255, 255),
             )
@@ -45,8 +49,15 @@ class OnlineGameManagerTestState(State):
 
 
 class OfflineGameManagerTestState(State):
-    def __init__(self, game, data=None, layer="foreground"):
-        super().__init__(game, data, layer)
+    def __init__(
+        self,
+        game,
+        data=None,
+        layer="foreground",
+        bg_color=(0, 0, 0),
+        previous_state=None,
+    ):
+        super().__init__(game, data, layer, bg_color, previous_state)
         player = Player(player_id="player", player_name="player")
         bot = Player(player_id="bot", player_name="bot")
         self.gm = GameManager(game, players=[player, bot])
@@ -75,6 +86,16 @@ class OfflineGameManagerTestState(State):
             corner_radius=0,
         )
 
+        self.open_history = TextButton(
+            self.canvas,
+            center=(self.game.GAME_W * 0.15, self.game.GAME_H * 0.75),
+            text="Open history",
+            command=lambda: self.game.push_state(
+                HistoryViewState(game, {"history": self.gm.history})
+            ),
+        )
+        self.open_history.pack()
+
     def state_machine(self):
         if self.gm.active_player == PlayerType.OP:
             card, row, col = self.bot.think(self.gm.board)
@@ -86,6 +107,9 @@ class OfflineGameManagerTestState(State):
         self.state_machine()
         self.turn_info_label.set_text(f"Turn Count: {self.gm.turn_count}")
         self.turn_info_label2.set_text(f"Active player: {self.gm.active_player}")
+        self.debug_label.set_text(
+            f"mouse: {(100*float(self.game.cursorpos[0])/self.game.GAME_W):.2f}%, {(100*float(self.game.cursorpos[1])/self.game.GAME_H):.2f}%"
+        )
 
     def render(self, surface):
         super().render(surface)

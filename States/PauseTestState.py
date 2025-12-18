@@ -10,7 +10,9 @@ class PauseTestState(State):
         super().__init__(game, msg, layer)
         self.paused = False
         self.img = pygame.image.load(os.path.join(ART_PATH, "SacAltar.png"))
-        self.blur_rect = pygame.Rect(0, 0, self.game.SCREEN_W, self.game.SCREEN_H)
+        self.blur_rect = pygame.Rect(
+            0, 0, self.game.settings.SCREEN_W, self.game.settings.SCREEN_H
+        )
 
     def toggle_blur_rect(self):
         self.paused = not self.paused

@@ -8,7 +8,7 @@ class WheelTestState(State):
         self.wheel = Wheel(self.game, self)
         self.wheel.max_n = 20
         self.wheel.scale(4.0)
-        self.wheel.move(self.game.SCREEN_CENTER)
+        self.wheel.move(self.game.GAME_CENTER)
         # self.wheel.is_spinning = True
         self.wheel.spin()
 

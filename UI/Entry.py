@@ -134,7 +134,7 @@ class Entry(UIElement):
                 self.key_pressed_timer.update()
 
             if self.game.clicked_sx == -1:
-                if self.rect.collidepoint(self.game.mousepos):
+                if self.rect.collidepoint(self.game.cursorpos):
                     self.focused = True
                     self.fg_color = self.focus_color
                     self.game.need_key_event_handling = False
@@ -185,7 +185,9 @@ class Entry(UIElement):
                             if event.key == pygame.K_v:
                                 self.text = pyperclip.paste()
                                 try:
-                                    surf = self.font.render(self.text, True, (255, 255, 255))
+                                    surf = self.font.render(
+                                        self.text, True, (255, 255, 255)
+                                    )
                                     rect = surf.get_rect()
                                 except pygame.error:
                                     print(f"Error in rendering text: {self.text}")
@@ -413,9 +415,7 @@ class Caret:
         )
 
         self.topleft: pygame.Vector2 = self.parent.rect.topleft + self.offset
-        self.rect = pygame.Rect(
-            self.topleft, (2, self.parent.font.get_height() + 6)
-        )
+        self.rect = pygame.Rect(self.topleft, (2, self.parent.font.get_height() + 6))
         self.index_in_text = len(self.parent.text)
 
     def add_char(self, char):

@@ -22,7 +22,7 @@ class Tween:
     ):
         self.motion = motion.value if isinstance(motion, EasingType) else motion
         self.target = target
-        self.duration = duration
+        self.duration = duration if duration is not None else 1.0
         # self.type = type # todo: implement
         self.on_finish = on_finish
         self.kwargs = kwargs
@@ -119,7 +119,11 @@ class TweenManager:
         tweens_to_remove = []
         for tween in self.tweens:
             if tween.target == target:
-                if tween_property is None or tween.kwargs.get("tween_property") == tween_property:
+                if (
+                    tween_property is None
+                    or tween.kwargs.get("tween_property") == tween_property
+                ):
+                    # print(f"[TweenManager] KILLING tween: {tween}")
                     tween.stop()
                     tweens_to_remove.append(tween)
 
@@ -159,7 +163,9 @@ class TweenManager:
         for tween in self.tweens:
             tween.update()
             if tween.is_finished():
+                # print(f"[TweenManager] Tween FINISHED: {tween}")
                 if tween.on_finish:
+                    # print(f"[TweenManager] Calling on_finish for {tween}")
                     tween.on_finish.__call__()
                 self.tweens.remove(tween)
 

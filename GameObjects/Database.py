@@ -1,7 +1,9 @@
-from GameObjects.Card import Card, CardTag
+from GameObjects.Card import Card, CardTag, ChangeRingCard, SpellCard
 from GameObjects.EffectContext import EffectContext
 from Constants import ART_PATH
 import os
+
+from GameObjects.MathRing import Ring, Zn
 
 # print(ART_PATH)
 
@@ -36,19 +38,44 @@ def mvn_trigger(ctx: EffectContext):
     if ctx.source_card in neighbour_cards:
         new_power = ctx.source_card.current_power + 1
         ctx.source_card.change_power(new_power)
-        ctx.source_card.current_power = new_power  # Also update CardController's current_power
+        ctx.source_card.current_power = (
+            new_power  # Also update CardController's current_power
+        )
+
+
+def plus_1_on_play(ctx: EffectContext):
+    if isinstance(ctx.game_manager.ring, Zn):
+        ctx.game_manager.ring.set_ring(Zn(ctx.game_manager.ring.ring.n + 1))
 
 
 CARD_DATABASE = {
     "goth_girl": Card(
         "Maire von Neumann",
-        5,
         os.path.join(ART_PATH, "GothGirl-removebg-preview.png"),
         [CardTag.HUMAN],
         effects={"on_play": [mvn_on_play], "trigger": [mvn_trigger]},
         description="Boosts self by 1 whenever a human is played in an adjacent tile, also boosts nearby cards on play",
-    )
+        base_power=5,
+    ),
+    # "times_x": SpellCard(
+    #     "times x",
+    #     art_path="times_x.png",
+    #     tags=[CardTag.SPELL, CardTag.SCIENCE],
+    #     description="If present, multiplies quotienting polynomial by x",
+    # ),
+    "plus_1": SpellCard(
+        "plus 1",
+        art_path="plus_1.png",
+        tags=[CardTag.SPELL, CardTag.SCIENCE],
+        description="If present, adds 1 to the modulus (e.g. Z2 becomes Z3)",
+        effects={"on_play": [plus_1_on_play]},
+    ),
+    "Z": ChangeRingCard(Ring.Z),
+    "Q": ChangeRingCard(Ring.Q),
 }
+for i in range(2, 21):
+    CARD_DATABASE[f"Z{i}"] = ChangeRingCard(Zn(i))
+
 
 DECK_DATABASE = {"base_deck": [{"Maire von Neumann": 10}]}
 
@@ -73,6 +100,7 @@ if __name__ == "__main__":
 
     # Initialize pygame for font rendering
     import pygame
+
     pygame.init()
 
     # Create mock game object with real font
@@ -81,11 +109,7 @@ if __name__ == "__main__":
 
     # Create a real font for rendering
     mock_font = pygame.font.Font(None, 24)
-    mock_game.fonts = {
-        "javier_skull": {
-            "small": mock_font
-        }
-    }
+    mock_game.fonts = {"javier_skull": {"small": mock_font}}
 
     # Create board
     board = Board(mock_game)
@@ -96,11 +120,15 @@ if __name__ == "__main__":
 
     card1 = CardController(mock_game)
     card1.from_card(mvn_card)
-    print(f"Card 1 created: {card1.name}, base_power={card1.base_power}, current_power={card1.current_power}")
+    print(
+        f"Card 1 created: {card1.name}, base_power={card1.base_power}, current_power={card1.current_power}"
+    )
 
     card2 = CardController(mock_game)
     card2.from_card(mvn_card)
-    print(f"Card 2 created: {card2.name}, base_power={card2.base_power}, current_power={card2.current_power}\n")
+    print(
+        f"Card 2 created: {card2.name}, base_power={card2.base_power}, current_power={card2.current_power}\n"
+    )
 
     # Mock game state - can be None since our effects don't actually use it
     mock_game_state = None
@@ -117,14 +145,16 @@ if __name__ == "__main__":
         board=board,
         row=row1,
         col=col1,
-        trigger="on_play"
+        trigger="on_play",
     )
 
     if mvn_card.effects.get("on_play"):
         for effect in mvn_card.effects["on_play"]:
             effect(ctx1)
 
-    print(f"Card 1 power after on_play: {card1.current_power} (expected: 5, no neighbors)\n")
+    print(
+        f"Card 1 power after on_play: {card1.current_power} (expected: 5, no neighbors)\n"
+    )
 
     # Play second card at (1, 2) - adjacent to first
     print("=== Playing Card 2 at (1, 2) - adjacent to Card 1 ===")
@@ -138,7 +168,7 @@ if __name__ == "__main__":
         board=board,
         row=row2,
         col=col2,
-        trigger="on_play"
+        trigger="on_play",
     )
 
     if mvn_card.effects.get("on_play"):
@@ -159,7 +189,7 @@ if __name__ == "__main__":
                 row=row2,  # Position of newly played card
                 col=col2,
                 trigger="trigger",
-                target_card=card2
+                target_card=card2,
             )
             for effect in existing_card.card_model.effects["trigger"]:
                 effect(trigger_ctx)
@@ -169,8 +199,12 @@ if __name__ == "__main__":
 
     # Final results
     print("=== FINAL RESULTS ===")
-    print(f"Card 1 (played first at {row1},{col1}): {card1.current_power} (expected: 7)")
-    print(f"Card 2 (played second at {row2},{col2}): {card2.current_power} (expected: 5)")
+    print(
+        f"Card 1 (played first at {row1},{col1}): {card1.current_power} (expected: 7)"
+    )
+    print(
+        f"Card 2 (played second at {row2},{col2}): {card2.current_power} (expected: 5)"
+    )
 
     if card1.current_power == 7 and card2.current_power == 5:
         print("\n[PASS] TEST PASSED!")

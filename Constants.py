@@ -1,6 +1,7 @@
 import os
 import pygame as p
 
+# SCALING_FACTOR = 100
 SCALING_FACTOR = 40
 CARD_DIMENSIONS = SCALING_FACTOR * p.Vector2(2.5, 3.5)
 CARD_ART_SIZE_RATIO = 0.7
@@ -20,6 +21,7 @@ COLORS = {
 GRID_DIMENSIONS = (5, 9)
 
 ART_PATH = os.path.join(os.getcwd(), "Assets", "sprites", "art")
+UI_PATH = os.path.join(os.getcwd(), "Assets", "sprites", "ui")
 CARD_BASE_PATH = os.path.join(ART_PATH, "CardBase.png")
 CARD_BACK_PATH = os.path.join(ART_PATH, "CardBack.png")
 

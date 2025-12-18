@@ -3,7 +3,7 @@ from Game import Game
 from Collections.Stack import Stack
 import pygame as p
 
-from GameObjects.Card import Card, CardController
+from GameObjects.Card import Card, CardControllerBase, create_card_controller
 from GameObjects.GameObject import GameObject
 from PModels import PlayerType
 
@@ -42,12 +42,17 @@ class HandController(GameObject):
         self.rect.center = center
         self.distance_between_cards = distance_between_cards
         self.owner: int = PlayerType.ME
-        self.cards: list[CardController] = []
+        self.cards: list[CardControllerBase] = []
 
-    def add_card(self, c: Card):
+    def add_card(self, c: Card, bg_image="GreenBG1.png"):
+        """Add a card to the hand. Automatically creates the correct controller type.
+
+        Args:
+            c: Card or SpellCard instance
+            bg_image: Background image for spell cards (default: GreenBG1.png)
+        """
         self.hand_model.add_card(c)
-        c_go = CardController(self.game, self)
-        c_go.from_card(c)
+        c_go = create_card_controller(self.game, c, self, bg_image)
         self.cards.append(c_go)
         r = self.rect.copy()
         r.width += CARD_DIMENSIONS[0] + self.distance_between_cards

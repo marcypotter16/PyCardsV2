@@ -46,7 +46,7 @@ class TextButton(UIElement):
     def update(self, dt):
         if self.visible:
             if self.interactable:
-                if self.rect.collidepoint(self.game.mousepos):
+                if self.rect.collidepoint(self.game.cursorpos):
                     self.hover(dt)
                     # == -1 perchè voglio che il bottone sia cliccato quando rilasci il bottone del mouse
                     if self.game.clicked_sx == -1:
@@ -143,7 +143,7 @@ class ImageButton(TextButton):
 
     def update(self, dt):
         # print(self.current_image_index)
-        if self.rect.collidepoint(self.game.mousepos):
+        if self.rect.collidepoint(self.game.cursorpos):
             if self.game.actions["mouse_sx"]:
                 self.current_image = self.mouse_pressed_image
             elif self.game.clicked_sx == -1:
@@ -153,7 +153,7 @@ class ImageButton(TextButton):
         else:
             self.unhover()
         if self.game.clicked_sx == -1 and not self.rect.collidepoint(
-            self.game.mousepos
+            self.game.cursorpos
         ):
             self.current_image = self.animation[0]
             self.current_image_index = 0

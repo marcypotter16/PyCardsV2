@@ -1,7 +1,8 @@
 import pygame
 
 from Game import Game
-from States.State import State
+
+# from States.State import State
 from UI.Abstract import UIElement, UICanvas
 from Utils.Text import draw_centered_text
 
@@ -39,7 +40,8 @@ class Label(UIElement):
         self.underline = underline
 
         if font is None:
-            self.font = self.game.fonts["comfortaa"]["small"]
+            # self.font = self.game.fonts["ant"]["small"]
+            self.font = self.game.get_font("ant", 15)
         else:
             self.font = font
 
@@ -51,7 +53,9 @@ class Label(UIElement):
 
         # Auto-size the label based on text if width/height not provided
         if width is None:
-            surf = self.font.render(self.text if self.text else " ", True, (255, 255, 255))
+            surf = self.font.render(
+                self.text if self.text else " ", True, (255, 255, 255)
+            )
             rect = surf.get_rect()
             self.width = self.rect.width = rect.width + 20
         else:
@@ -193,7 +197,7 @@ if __name__ == "__main__":
     s = State(g)
     l = Label(
         s.canvas,
-        center=g.SCREEN_CENTER,
+        center=g.GAME_CENTER,
         width=100,
         height=20,
         text=text,

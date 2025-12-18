@@ -49,8 +49,10 @@ class SlotController(GameObject):
         if self.content is None:
             self.content = c
             c.parent = self
-            c.tween_pos(self.rect.center)
-            c.tween_scale_to(1.0, self.rect.center)
+            if c.transform.scale != 1:
+                c.tween_pos_and_scale(self.rect.center, 1.0)
+            else:
+                c.tween_pos(self.rect.center)
 
     def set_available(self, available: bool):
         self.available = available

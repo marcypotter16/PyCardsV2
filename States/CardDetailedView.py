@@ -1,4 +1,4 @@
-from GameObjects.Card import CardController
+from GameObjects.Card import create_card_controller
 from GameObjects.Database import CARD_DATABASE
 from States.State import State
 import pygame as p
@@ -6,6 +6,7 @@ import pygame.freetype
 
 from UI.Button import TextButton
 from UI.Label import Label
+from Utils.Draw import create_back_button
 
 
 class CardDetailedView(State):
@@ -18,32 +19,56 @@ class CardDetailedView(State):
     ):
         super().__init__(game, data, layer)
         self.card_data = card
-        self.card = CardController(self.game, self)
-        self.card.from_card(card)
-        self.card.scale_by(0)
+        # Use factory function to create the appropriate card controller
+        bg_img = "BG2.png" if not hasattr(card, "bg_image") else card.bg_image
+        self.card = create_card_controller(
+            self.game,
+            card,
+            parent=self,
+            bg_image=bg_img,
+        )
+        # self.card.scale_by(0)
         self.card.move((self.game.GAME_W * 0.25, self.game.GAME_H * 0.5))
+        self.target_scale = 2.0
         self.font = self.game.fonts["october_crow"]["medium"]
         # self.text_surf = p.Surface(
         #     (self.game.GAME_W * 0.7, self.game.GAME_H * 0.9), p.SRCALPHA
         # )
-        self.text_alpha = 0
-        self.text_color = (255, 255, 255)
-        self.anim_dur = 2
-        # self.text_surf = self.text_surf.convert_alpha()
-        self.game.tweener_manager.add_tween(
-            self, "text_alpha", to_=255, duration=self.anim_dur
-        )
-        self.card.tween_scale_to(7.0)
-        self.go_back_btn = TextButton(
+        # self.text_alpha = 0
+        # self.text_color = (255, 255, 255)
+        # self.anim_dur = 2
+        # # self.text_surf = self.text_surf.convert_alpha()
+        # self.game.tweener_manager.add_tween(
+        #     self, "text_alpha", to_=255, duration=self.anim_dur
+        # )
+        self.card.tween_scale_to(self.target_scale)
+        # self.go_back_btn = TextButton(
+        #     self.canvas,
+        #     center=(self.game.GAME_W - 30, 15),
+        #     width=15,
+        #     height=15,
+        #     text="<",
+        #     corner_radius=2,
+        #     command=self.game.pop_state,
+        # )
+        self.go_back_btn = create_back_button(
+            game,
             self.canvas,
-            center=(self.game.GAME_W - 30, 15),
-            width=15,
-            height=15,
-            text="<",
-            corner_radius=2,
-            command=self.game.pop_state,
+            (
+                game.GAME_W * 0.95,
+                20,
+            ),
         )
-        r = p.Rect(self.game.GAME_W * 0.6, 30, self.game.GAME_W * 0.5, 60)
+        self.go_back_label = Label(
+            self.canvas,
+            x=game.GAME_W * 0.95 - 5,
+            y=40,
+            text="back",
+            font=self.game.get_font("ant", 15),
+            fg_color=pygame.Color("white"),
+        )
+        r = p.Rect(self.game.GAME_W * 0.55, 30, self.game.GAME_W * 0.4, 60)
+        # Card title (name)
         self.lab_title = Label(
             self.canvas,
             center=r.center,
@@ -53,21 +78,62 @@ class CardDetailedView(State):
             text=self.card_data.name,
             font=self.game.fonts["october_crow"]["big"],
         )
+
+        # Card description - rendered with ant font, half of GAME_W width
+        desc_width = int(self.game.GAME_W * 0.4)
         self.lab_desc = Label(
             self.canvas,
-            center=p.Vector2(r.center) + p.Vector2(0, 100),
-            width=r.w,
-            height=r.height,
+            center=p.Vector2(r.center) + p.Vector2(0, 150),
+            width=desc_width,
+            height=200,
             fg_color=(255, 255, 255),
             text=self.card_data.description,
+            font=self.game.fonts["ant"]["medium"],
         )
+
+        # Separator after description
+        desc_separator_y = self.lab_desc.rect.bottom + 20
+
+        # Card power (only for regular Cards, not SpellCards)
+        # power_text = ""
+        if hasattr(self.card_data, "base_power"):
+            power_text = f"Power: {self.card_data.base_power}"
+            self.lab_power = Label(
+                self.canvas,
+                center=p.Vector2(r.center) + p.Vector2(0, 300),
+                width=r.w,
+                height=r.h,
+                fg_color=(255, 255, 255),
+                text=power_text,
+                font=self.game.fonts["ant"]["medium"],
+            )
+
+        # Card tags - format as human-readable text
+        if hasattr(self.card_data, "tags") and self.card_data.tags:
+            # Convert tags to nice format: "Science, Human, Element"
+            tags_text = ", ".join(
+                tag.replace("_", " ").title() for tag in self.card_data.tags
+            )
+        else:
+            tags_text = "No tags"
+
+        tags_y_pos = desc_separator_y + 80
         self.lab_tags = Label(
             self.canvas,
-            center=p.Vector2(r.center) + p.Vector2(0, 400),
+            center=p.Vector2(r.center[0], tags_y_pos),
             width=r.w,
             height=r.h,
             fg_color=(255, 255, 255),
-            text=str(self.card_data.tags),
+            text=tags_text,
+            font=self.game.fonts["ant"]["medium"],
+        )
+
+        # Store separator position for rendering
+        self.desc_separator_rect = p.Rect(
+            self.game.GAME_W * 0.6,
+            desc_separator_y,
+            self.game.GAME_W * 0.35,
+            2,
         )
         # self.text_surf = self.font.render("AABBCCddeeff", True, self.text_color)
         # self.text_surf.set_alpha(0)
@@ -79,10 +145,22 @@ class CardDetailedView(State):
     def render(self, surface):
         super().render(surface)
         self.card.render(surface)
-        # Separator
+        # Separator between title and description
         p.draw.rect(
             surface,
             (100, 100, 100),
-            p.Rect(self.game.GAME_W * 0.5, 100, self.game.GAME_W * 0.45, 4),
+            p.Rect(
+                self.game.GAME_W * 0.5,
+                100,
+                self.game.GAME_W * 0.45,
+                4,
+            ),
+            border_radius=3,
+        )
+        # Separator between description and tags
+        p.draw.rect(
+            surface,
+            (100, 100, 100),
+            self.desc_separator_rect,
             border_radius=3,
         )

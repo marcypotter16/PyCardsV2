@@ -24,7 +24,7 @@ class MainMenu(State):
         # UI
         self.ipt_p_name = Entry(
             self.canvas,
-            center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] - 80),
+            center=(self.game.GAME_CENTER[0], self.game.GAME_CENTER[1] - 80),
             placeholder="Potter",
             bg_color=(50, 50, 50),
         )
@@ -33,7 +33,7 @@ class MainMenu(State):
 
         self.ipt_r_id = Entry(
             self.canvas,
-            center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] - 120),
+            center=(self.game.GAME_CENTER[0], self.game.GAME_CENTER[1] - 120),
             placeholder="12345678",
             bg_color=(50, 50, 50),
             height=40,
@@ -44,7 +44,7 @@ class MainMenu(State):
 
         self.res_label = Label(
             self.canvas,
-            center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] - 200),
+            center=(self.game.GAME_CENTER[0], self.game.GAME_CENTER[1] - 200),
             height=100,
             width=1000,
             fg_color=(255, 255, 255),
@@ -52,7 +52,7 @@ class MainMenu(State):
         )
         self.btn_connect = TextButton(
             self.canvas,
-            center=self.game.SCREEN_CENTER,
+            center=self.game.GAME_CENTER,
             text="Connect",
             command=self._on_connect_clicked,
         )
@@ -61,7 +61,7 @@ class MainMenu(State):
 
         self.btn_create_room = TextButton(
             self.canvas,
-            center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] + 40),
+            center=(self.game.GAME_CENTER[0], self.game.GAME_CENTER[1] + 40),
             text="Create Room",
             command=self._on_create_clicked,
         )
@@ -69,7 +69,7 @@ class MainMenu(State):
 
         self.btn_enqueue = TextButton(
             self.canvas,
-            center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] + 80),
+            center=(self.game.GAME_CENTER[0], self.game.GAME_CENTER[1] + 80),
             text="Join Queue",
             command=self._on_join_queue_clicked,
         )
@@ -186,14 +186,14 @@ class RoomState(State):
 
         self.lab_title = Label(
             self.canvas,
-            center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] - 300),
+            center=(self.game.GAME_CENTER[0], self.game.GAME_CENTER[1] - 300),
             text=f"Welcome to room {self.data.room_id}",
             font=self.game.font_big,
             fg_color=(255, 255, 255),
         )
         self.btn_copy_room_id = TextButton(
             self.canvas,
-            center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] - 20),
+            center=(self.game.GAME_CENTER[0], self.game.GAME_CENTER[1] - 20),
             text="Copy Room id",
             command=lambda: pyperclip.copy(self.data.room_id),
         )
@@ -226,7 +226,7 @@ class RoomState(State):
         if self.parent_ref.socket_manager.is_host():
             self.btn_start_game = TextButton(
                 self.canvas,
-                center=(self.game.SCREEN_CENTER[0], self.game.SCREEN_CENTER[1] + 20),
+                center=(self.game.GAME_CENTER[0], self.game.GAME_CENTER[1] + 20),
                 text="Start game",
                 command=self.start_game,
             )
