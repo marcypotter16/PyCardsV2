@@ -1,65 +1,133 @@
-# A template for object oriented game making with [pygame](https://www.pygame.org/)
+🃏 Card Game (Pygame)
 
-## Quickstart
+A 2D card game built with Python and Pygame, featuring resolution-independent rendering, scalable UI, and a clean game-state architecture.
 
-On Windows you can simply install it via `pip install pygame` in a Command Prompt.
+This project is primarily focused on:
 
-Create a file in the "States" folder, write a class that extends State, look "BlankState" for an easy example.
-You can attach UI elements to the state just by creating them as members of the class.
+Correct handling of multiple resolutions and aspect ratios
 
-Every entity in the game should have two important methods:
-* `update(self, dt: float)`
-* `render(self, surface: pygame.Surface)`
-  
-and a property `game`, which is useful for many reasons like key handling and font methods.
+Clean separation between game logic and rendering
 
-For example I can create a class Circle
-```python
-from pygame import Vector2
-from pygame.draw import circle
+Smooth card rendering and zooming without distortion
 
-class Circle:
-	def __init__(self, game, radius = 10):
-		self.game = game
-		self.position = Vector2(100, 100)
-		self.radius = radius
+✨ Features
 
-	def render(self, surface):
-		circle(surface, color=(255, 255, 255), center=self.position, radius=self.radius)
+🎴 Card-based gameplay
 
-	def update(self, delta_time):
-		self.position.x += 1
-```
+🖥️ Resolution-independent rendering using a logical game canvas
 
-and put it in a State
-```python
-from States.State import State
+📐 Automatic scaling with letterboxing (no stretching)
 
-class SomeState(State):
-	def __init__(self, game, data: object | None = None, layer="foreground"):
-		super().__init__(game, msg, layer)
+🖱️ Correct mouse input mapping (screen → game coordinates)
 
-		self.circle = Circle(self.game)
+🔄 State stack system (menus, gameplay, overlays)
 
-	def render(self, surface):
-		super().render(surface)
-		self.circle.render(surface)
+⚙️ Configurable settings (resolution, FPS)
 
-	def update(self, delta_time):
-		super().update(delta_time)
-		self.circle.update(delta_time)
+📸 Rendering Architecture (Overview)
 
-```
+The game uses a fixed logical resolution for all game logic and rendering:
 
-Then you can just run `main.py` with the following code:
-```python
-from Game import Game
-from States.SomeState import SomeState
+Game World (logical resolution)
+        ↓ scale
+Screen (actual window size)
 
-g = Game()
-g.load_state(SomeState(g))
-g.game_loop()
 
-```
+All gameplay is rendered to an off-screen game canvas
 
-To draw text on the screen you can use the `draw_text` and `draw_centered_text` functions in Utils/Text.py
+The canvas is scaled uniformly to fit the window
+
+Black bars (letterboxing) are used if aspect ratios differ
+
+Mouse input is transformed back into game coordinates
+
+This ensures:
+
+No stretching
+
+Consistent positioning
+
+Clean scaling at any resolution
+
+🛠️ Requirements
+
+Python 3.10+ (recommended)
+
+Pygame 2.0+
+
+Install dependencies:
+
+pip install pygame
+
+▶️ Running the Game
+
+Clone the repository and run:
+
+python main.py
+
+
+(Replace main.py with your actual entry point if different.)
+
+📁 Project Structure (simplified)
+.
+├── assets/          # Card images, fonts, sounds
+├── states/          # Game states (menu, gameplay, etc.)
+├── core/
+│   ├── renderer.py  # Scaling & rendering logic
+│   ├── settings.py  # GameSettings class
+│   └── input.py     # Mouse / input helpers
+├── main.py          # Game entry point
+└── README.md
+
+⚙️ Settings
+
+Game settings are handled via a GameSettings class and can be serialized to JSON.
+
+Example options:
+
+Logical game resolution
+
+Window resolution
+
+Target FPS
+
+This makes it easy to add:
+
+Config files
+
+Settings menus
+
+Resolution switching
+
+🚧 Status
+
+This project is under active development.
+Gameplay, visuals, and features are still evolving.
+
+Expect:
+
+Refactors
+
+API changes
+
+Placeholder assets
+
+🧠 Notes for Developers
+
+All game logic uses game-space coordinates
+
+Never use screen coordinates directly for gameplay
+
+Rendering and input both go through the same transform logic
+
+Scaling happens once per frame, surface allocation only on resize
+
+📜 License
+
+MIT License (or replace with your preferred license).
+
+🙌 Acknowledgements
+
+Built with Pygame
+
+Inspired by classic digital card games and clean 2D engine design
