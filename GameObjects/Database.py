@@ -17,7 +17,6 @@ def mvn_on_play(ctx: EffectContext):
     for card in neighbour_cards:
         new_power = card.current_power + 1
         card.change_power(new_power)
-        card.current_power = new_power  # Also update CardController's current_power
 
 
 def mvn_trigger(ctx: EffectContext):
@@ -48,13 +47,22 @@ def plus_1_on_play(ctx: EffectContext):
         ctx.game_manager.ring.set_ring(Zn(ctx.game_manager.ring.ring.n + 1))
 
 
+def frobenius_on_play(ctx: EffectContext):
+    if ctx.game_manager.ring.is_domain():
+        ctx.source_card.change_power(ctx.source_card.current_power * 2)
+
+
+def frobenius_trigger(ctx: EffectContext):
+    pass
+
+
 CARD_DATABASE = {
     "goth_girl": Card(
         "Maire von Neumann",
         os.path.join(ART_PATH, "GothGirl-removebg-preview.png"),
         [CardTag.HUMAN],
         effects={"on_play": [mvn_on_play], "trigger": [mvn_trigger]},
-        description="Boosts self by 1 whenever a human is played in an adjacent tile, also boosts nearby cards on play",
+        description="Boosts self by 1 whenever a human is played in an adjacent tile, also boosts by 1 nearby cards on play",
         base_power=5,
     ),
     # "times_x": SpellCard(
@@ -72,6 +80,14 @@ CARD_DATABASE = {
     ),
     "Z": ChangeRingCard(Ring.Z),
     "Q": ChangeRingCard(Ring.Q),
+    "frobenius": Card(
+        "Frobenius",
+        None,
+        tags=[CardTag.HUMAN, CardTag.SCIENCE],
+        effects={"on_play": [frobenius_on_play], "trigger": [frobenius_trigger]},
+        description="When played doubles its power, if the Frobenius endomorphism of the current active Ring is injective (i.e. the Ring is an Integral Domain). (TBI) If this card is in the field (TBC in any place) and the active Ring is changed to a Domain, gain 1 power. If it gets changed to a non Domain lose 1.",
+        base_power=3,
+    ),
 }
 for i in range(2, 21):
     CARD_DATABASE[f"Z{i}"] = ChangeRingCard(Zn(i))

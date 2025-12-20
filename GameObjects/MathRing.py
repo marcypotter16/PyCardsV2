@@ -1,4 +1,5 @@
 from enum import StrEnum
+import math
 import os
 
 import pygame
@@ -6,8 +7,21 @@ from Constants import ART_PATH, CARD_TWEEN_DUR
 from Game import Game
 from GameObjects.GameObject import GameObject
 from GameObjects.SpriteRenderer import SpriteRenderer
-from Utils.Colors import WHITE
-from Utils.Image import surf_from_svg
+
+
+def is_prime(n: int):
+    if n == 0 or n == 1:
+        return False
+    if n < 0:
+        return is_prime(-n)
+    if n <= 3:
+        return True
+    if n == 4:
+        return False
+    for i in range(2, int(n * 0.5)):
+        if n % i == 0:
+            return False
+    return True
 
 
 class Ring(StrEnum):
@@ -29,6 +43,15 @@ class PolyRingQuotient:
 class Zn:
     def __init__(self, n: int):
         self.n = n
+
+    def is_domain(self) -> bool:
+        return is_prime(self.n)
+
+    def is_field(self) -> bool:
+        return is_prime(self.n)
+
+    def get_invertibles(self) -> list[int]:
+        return [i for i in range(self.n) if math.gcd(i, self.n) == 1]
 
     def __str__(self):
         return f"Z/{self.n}Z"
@@ -215,6 +238,18 @@ class RingController(GameObject):
             self.transform.scale_by(initial_scale)
             self.scale_by(initial_scale)
 
+    def is_domain(self) -> bool:
+        """Check if the current ring is an integral domain"""
+        match self.ring:
+            case Ring():
+                return True  # Q, Z, R, C, F are all domains
+            case Zn():
+                return self.ring.is_domain()  # Z/nZ is a domain iff n is prime
+            case PolyRingQuotient():
+                return False  # Would need to check if quotient poly is irreducible
+            case _:
+                return False
+
     def set_color(self, new_color: pygame.Color):
         self.color = new_color
         self.set_ring(self.ring, self.used_font, self.color)
@@ -339,17 +374,32 @@ class RingController(GameObject):
         # Handle child sprites based on ring type
         if isinstance(self.ring, Zn) and self.n_sprite.is_visible:
             # Calculate new position for n_sprite relative to ring
-            current_offset = self.n_sprite.transform.position - self.ring_sprite.transform.position
+            current_offset = (
+                self.n_sprite.transform.position - self.ring_sprite.transform.position
+            )
             new_offset = current_offset * scale_ratio
             new_n_pos = target_position + new_offset
             self.n_sprite.tween_pos(new_n_pos)
             # Scale the n_sprite font by tweening (we'll re-render at final scale)
             self.n_sprite.tween_scale_to(scale_ratio)
 
-        elif isinstance(self.ring, PolyRingQuotient) and self.quotient_poly_sprite.is_visible:
+        elif (
+            isinstance(self.ring, PolyRingQuotient)
+            and self.quotient_poly_sprite.is_visible
+        ):
             # Calculate new position for quotient poly sprite
-            current_offset = self.quotient_poly_sprite.transform.position - self.ring_sprite.transform.position
+            current_offset = (
+                self.quotient_poly_sprite.transform.position
+                - self.ring_sprite.transform.position
+            )
             new_offset = current_offset * scale_ratio
             new_poly_pos = target_position + new_offset
             self.quotient_poly_sprite.tween_pos(new_poly_pos)
             self.quotient_poly_sprite.tween_scale_to(scale_ratio)
+
+
+if __name__ == "__main__":
+    # for i in range(20):
+    #     print(f"{i}: {is_prime(i)}")
+    z20 = Zn(20)
+    print(z20.get_invertibles())

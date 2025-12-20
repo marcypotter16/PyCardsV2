@@ -17,7 +17,7 @@ from Utils.Colors import BLACK, GRAY, WHITE
 
 g: Game = Game()
 # g.load_state(BezierTestState(g))
-# c = CardTestState(g)
+c = CardTestState(g)
 # c.from_card(CARD_DATABASE["goth_girl"])
 # c.card.move(g.SCREEN_CENTER)
 # c = HandTestState(g)
@@ -29,5 +29,5 @@ c = OfflineGameManagerTestState(g)
 # c = MainMenu(g)
 # c = RingTestState(g, bg_color=GRAY)
 # c.local_testing = True
-g.load_state(c)
+g.push_state(c)
 g.game_loop()

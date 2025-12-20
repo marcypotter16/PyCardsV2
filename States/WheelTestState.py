@@ -4,7 +4,7 @@ from States.State import State
 
 class WheelTestState(State):
     def __init__(self, game, data: object | None = None, layer="foreground"):
-        super().__init__(game, msg, layer)
+        super().__init__(game, data, layer)
         self.wheel = Wheel(self.game, self)
         self.wheel.max_n = 20
         self.wheel.scale(4.0)

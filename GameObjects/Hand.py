@@ -70,8 +70,8 @@ class HandController(GameObject):
             pos_y = y0
             # c.tween_pos((pos_x, pos_y))
             # TODO go back to tweening
-            c.move((pos_x, pos_y))
-            c.drop()
+            c.tween_pos((pos_x, pos_y), True)
+            # c.drop()
             if self.owner == PlayerType.OP and c.face_up:
                 c.flip()
 

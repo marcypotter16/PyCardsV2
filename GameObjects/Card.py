@@ -8,7 +8,8 @@ from Constants import (
     ART_PATH,
     CARD_ART_SIZE_RATIO,
     CARD_BACK_PATH,
-    CARD_BASE_PATH,
+    CARD_BASE_PATH_1,
+    CARD_BASE_PATH_2,
     CARD_DIMENSIONS,
     CARD_TWEEN_DUR,
 )
@@ -115,7 +116,7 @@ class Card(SpellCard):
 class CardControllerBase(GameObject):
     """Base class for all card controllers (regular cards and spell cards)"""
 
-    def __init__(self, game, parent=None):
+    def __init__(self, game, parent=None, card_model: BaseCard | None = None):
         super().__init__(game, parent)
         self.last_saved_pos = self.transform.position.copy()
         self.hovered = False
@@ -123,7 +124,7 @@ class CardControllerBase(GameObject):
         self.uid: str = str(uuid.uuid4())
         self.dead: bool = False
         self.banished: bool = False
-        self.card_model: BaseCard = None
+        self.card_model: BaseCard = card_model
         self.name = ""
         self.base_sprite = None
         self.rect = None
@@ -183,27 +184,57 @@ class CardControllerBase(GameObject):
         """Override in subclasses for custom scaling behavior"""
         raise NotImplementedError("tween_scale_to must be implemented by subclass")
 
-    def tween_pos_and_scale(self, new_pos, new_scale):
+    def tween_pos_and_scale(self, new_pos, new_scale, drop=True, on_finish=None):
         """Override in subclasses for custom scaling behavior"""
-        raise NotImplementedError("tween_pos_and_scale must be implemented by subclass")
+        new_pos = p.Vector2(new_pos)
+
+        def _on_finish_wrapper():
+            if drop:
+                self.drop()
+            if on_finish:
+                on_finish()
+
+        self.game.tweener_manager.add_tween(
+            self.transform,
+            "position",
+            to_=new_pos,
+            duration=CARD_TWEEN_DUR,
+            on_finish=_on_finish_wrapper,
+        )
+        self.game.tweener_manager.add_tween(
+            self.transform,
+            "scale",
+            to_=new_scale,
+            duration=CARD_TWEEN_DUR,
+        )
 
 
 class CardController(CardControllerBase):
-    def __init__(self, game, parent=None):
-        super().__init__(game, parent)
+    def __init__(self, game, parent=None, card_model: BaseCard | None = None):
+        super().__init__(game, parent, card_model)
         self.base_sprite: SpriteRenderer = SpriteRenderer(
-            self, CARD_BASE_PATH, CARD_DIMENSIONS
+            self,
+            (
+                CARD_BASE_PATH_1
+                if card_model and card_model.owner == PlayerType.ME
+                else CARD_BASE_PATH_2
+            ),
+            CARD_DIMENSIONS,
         )
         self.art_sprite = SpriteRenderer(self)
         self.art_sprite.set_dim(CARD_ART_SIZE_RATIO * CARD_DIMENSIONS)
 
-        self.power_text_surf = self.game.fonts["october_crow"]["small"].render(
-            "0", False, p.Color(255, 255, 255)
+        self.power_text_font_size = 30
+        self.power_text_surf = self.game.get_font(
+            "ant", self.power_text_font_size
+        ).render("0", False, p.Color(255, 255, 255))
+        self.power_text_sprite = SpriteRenderer(
+            self, self.power_text_surf, scale_img_to_dim=False
         )
-        self.power_text_sprite = SpriteRenderer(self, self.power_text_surf, (20, 20))
 
         # Store the initial offset from card center for scaling
-        self.power_text_offset = -0.5 * CARD_DIMENSIONS + p.Vector2(5, 5)
+        # self.power_text_offset = -0.5 * CARD_DIMENSIONS + p.Vector2(5, 5)
+        self.power_text_offset = p.Vector2(0, 0)
         self.power_text_sprite.move(self.power_text_offset)
 
         for c in self.children:
@@ -249,11 +280,12 @@ class CardController(CardControllerBase):
             case _:
                 color = p.Color(0, 255, 0)  # Green
 
-        self.power_text_surf = self.game.fonts["october_crow"]["small"].render(
-            str(new_power), False, color
-        )
+        self.power_text_surf = self.game.get_font(
+            "ant", self.power_text_font_size
+        ).render(str(new_power), False, color)
+        self.current_power = new_power
         self.card_model.current_power = new_power
-        self.power_text_sprite.set_sprite(self.power_text_surf)
+        self.power_text_sprite.set_sprite_no_scale(self.power_text_surf)
 
     def flip(self):
         self.face_up = not self.face_up
@@ -283,35 +315,27 @@ class CardController(CardControllerBase):
 
         self.change_power(card.base_power)
         self.art_path = card.art_path
-        self.art_sprite.set_sprite(p.image.load(self.art_path))
+        if card.art_path is not None:
+            self.art_sprite.set_sprite(p.image.load(self.art_path))
+        else:
+            placeholder = p.Surface(self.art_sprite.dimensions)
+            placeholder_color = p.Color("pink")
+            placeholder.fill(placeholder_color)
+            self.art_sprite.set_sprite(placeholder)
 
     def tween_pos(self, pos, drop=True, on_finish=None):
         super().tween_pos(pos, drop, on_finish)
         self.power_text_sprite.tween_pos(pos + self.power_text_offset)
 
-    def tween_pos_and_scale(self, new_pos, new_scale: float):
+    def tween_pos_and_scale(self, new_pos, new_scale: float, drop=True, on_finish=None):
         """Tween both position and scale together"""
+        super().tween_pos_and_scale(new_pos, new_scale, drop, on_finish)
         new_pos = p.Vector2(new_pos)
 
         # Debug
         print(
             f"[tween_pos_and_scale] card {self.name}: pos {self.transform.position} -> {new_pos}, scale {self.transform.scale} -> {new_scale}"
         )
-
-        # Tween the card's transform
-        self.game.tweener_manager.add_tween(
-            self.transform,
-            "position",
-            to_=new_pos,
-            duration=CARD_TWEEN_DUR,
-        )
-        self.game.tweener_manager.add_tween(
-            self.transform,
-            "scale",
-            to_=new_scale,
-            duration=CARD_TWEEN_DUR,
-        )
-
         # Tween sprite positions and scales
         self.base_sprite.tween_pos(new_pos)
         self.base_sprite.tween_scale_to(new_scale)
@@ -594,6 +618,13 @@ class ChangeRingCardController(CardControllerBase):
         self.ring.tween_scale_to(
             new_scale * self.initial_ring_scale, target_position=ring_target_pos
         )
+
+    def tween_pos_and_scale(self, new_pos, new_scale, drop=True, on_finish=None):
+        super().tween_pos_and_scale(new_pos, new_scale, drop, on_finish)
+        self.base_sprite.tween_pos(new_pos)
+        self.base_sprite.tween_scale_to(new_scale)
+        self.ring.tween_pos(new_pos)
+        self.ring.tween_scale_to(new_scale)
 
 
 def create_card_controller(

@@ -1,7 +1,10 @@
+from datetime import date
 import random
 from threading import Timer
+import time
 from typing import Dict, List
 from Bot import Bot
+from Constants import CARD_PLAYED_SHOW_TIME
 from Game import Game
 from GameObjects.Board import Board
 from GameObjects.Card import (
@@ -31,6 +34,7 @@ from PModels import (
     OmniGameState,
     PlayerType,
 )
+from Utils.Timer import SpacedCallback
 
 
 class GameManager(GameObject):
@@ -54,6 +58,14 @@ class GameManager(GameObject):
         self.ring = RingController(self.game, self)
         self.history: List[PHistoryEvent] = []
         self.debug = True
+        self._should_snap_back = True
+
+        def adjust_hand():
+            if self.dragged_card is None:
+                self.hand_me.reorder()
+
+        self.sc = SpacedCallback(adjust_hand, 30.0)
+        self.sc.start()
         self.setup()
 
     def setup(self):
@@ -86,13 +98,15 @@ class GameManager(GameObject):
             for _ in range(13):
                 self.deck_me.add_card(random.choice(list(CARD_DATABASE.values())))
                 self.deck_op.add_card(CARD_DATABASE["goth_girl"])
-            self.deck_me.add_card(CARD_DATABASE["goth_girl"])
+            self.deck_me.add_card(CARD_DATABASE["frobenius"])
             self.deck_me.add_card(CARD_DATABASE["goth_girl"])
             for i in range(5):
                 self.hand_me.add_card(
                     self.deck_me.get_and_remove_top_card(), bg_image="BG2.png"
                 )
-                self.hand_op.add_card(self.deck_op.get_and_remove_top_card())
+                self.hand_op.add_card(
+                    self.deck_op.get_and_remove_top_card(), bg_image="BG4.png"
+                )
                 # self.hand_op.cards[i].flip()
             for card in self.deck_me.cards:
                 card.owner = PlayerType.ME
@@ -140,6 +154,7 @@ class GameManager(GameObject):
     def update_cards_in_board(self, dt):
         for c in self.board.cards:
             c.update(dt)
+        # Note: this could be optimized, I don't think I need this for loop (TODO)
 
     def process_card_release(self):
         if self.active_player == PlayerType.OP:
@@ -149,21 +164,20 @@ class GameManager(GameObject):
         if isinstance(
             self.dragged_card, (SpellCardController, ChangeRingCardController)
         ):
-            self._should_dragged_card_follow_mouse = False
-            self._should_snap_back = False
-            self.dragged_card.move_percent(0.15, 0.25)
-            self.dragged_card.scale_by(2.0)
+            # If card is back to hand dont play it
+            if not self.hand_me.rect.collidepoint(self.game.cursorpos):
+                self._should_dragged_card_follow_mouse = False
+                self._should_snap_back = False
+                self.dragged_card.move_percent(0.15, 0.25)
+                # self.dragged_card.scale_by(2.0)
 
-            def _play_it():
-                self.play_card(self.dragged_card)
-                self.dragged_card = None
-                self._should_snap_back = True
-                self._should_dragged_card_follow_mouse = True
+                def _play_it():
+                    self.play_card(self.dragged_card)
 
-            timer = Timer(2.0, _play_it)
-            timer.start()
-            # _play_it()
-            return
+                timer = Timer(CARD_PLAYED_SHOW_TIME, _play_it)
+                timer.start()
+                # _play_it()
+                return
 
         card_placed = False
         for row in range(self.board.n_rows):
@@ -259,10 +273,16 @@ class GameManager(GameObject):
                 self.hand_me.reorder()
 
             def _on_finish():
-                print("onfinish of spell or changering")
+                print(f"onfinish of spell or changering {card} at {time.asctime()}")
                 self.gy.add_card(card.card_model)
+                self.dragged_card = None
+                self._should_snap_back = True
+                self._should_dragged_card_follow_mouse = True
 
-            card.tween_pos(self.gy.transform.position, on_finish=_on_finish)
+            print(f"card tween started at {time.asctime()}")
+            card.tween_pos_and_scale(
+                self.gy.transform.position, 0.0, on_finish=_on_finish
+            )
         self.active_player = (
             PlayerType.ME if self.active_player == PlayerType.OP else PlayerType.OP
         )
@@ -302,12 +322,13 @@ class GameManager(GameObject):
             self.opponent_card_in_progress = False
             print("[DEBUG] Card played, opponent_card_in_progress reset to False")
 
-        t = Timer(3, lambda: move_c_to_board(c))
+        t = Timer(CARD_PLAYED_SHOW_TIME, lambda: move_c_to_board(c))
         t.start()
         print(f"[DEBUG] Timer started for {c.name}")
 
     def update(self, dt):
         super().update(dt)
+        self.sc.update()
         # self.handle_hands(dt)
 
         # Debug: Press '1' to print game state as JSON
@@ -336,11 +357,16 @@ class GameManager(GameObject):
                         previous_state=self.game.state_stack.top(),
                     )
                 )
+            for c in self.board.cards:
+                if c.rect.collidepoint(self.game.cursorpos):
+                    self.game.push_state(CardDetailedView(self.game, card=c.card_model))
         if self.dragged_card is None:
             self.handle_hands(dt)
         else:
             if self._should_dragged_card_follow_mouse:
                 self.dragged_card.move(self.game.cursorpos)
+            # Update dragged card so tweens sync transform.position -> rect.center
+            self.dragged_card.update(dt)
         self.update_cards_in_board(dt)
         # self.board.update(dt)
 
@@ -426,6 +452,12 @@ class GameManager(GameObject):
 
     def render(self, surface):
         super().render(surface)
+        # Render dragged/animating card on top if it's not in hand (already rendered there)
+        if (
+            self.dragged_card is not None
+            and self.dragged_card not in self.hand_me.cards
+        ):
+            self.dragged_card.render(surface)
 
 
 class OfflineGameManager(GameManager):

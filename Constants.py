@@ -6,6 +6,7 @@ SCALING_FACTOR = 40
 CARD_DIMENSIONS = SCALING_FACTOR * p.Vector2(2.5, 3.5)
 CARD_ART_SIZE_RATIO = 0.7
 CARD_TWEEN_DUR = 0.3
+CARD_PLAYED_SHOW_TIME = 1.0
 
 SLOT_DIMENSIONS = CARD_DIMENSIONS * 1.1
 
@@ -22,7 +23,8 @@ GRID_DIMENSIONS = (5, 9)
 
 ART_PATH = os.path.join(os.getcwd(), "Assets", "sprites", "art")
 UI_PATH = os.path.join(os.getcwd(), "Assets", "sprites", "ui")
-CARD_BASE_PATH = os.path.join(ART_PATH, "CardBase.png")
+CARD_BASE_PATH_1 = os.path.join(ART_PATH, "BG3.png")
+CARD_BASE_PATH_2 = os.path.join(ART_PATH, "BG4.png")
 CARD_BACK_PATH = os.path.join(ART_PATH, "CardBack.png")
 
 # Multiplayer

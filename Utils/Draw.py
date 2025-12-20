@@ -2,6 +2,7 @@ import os
 import pygame
 
 from Constants import UI_PATH
+from Utils.Image import change_tint
 
 
 def draw_rect_alpha(surface, color, rect, corner_radius=10, width=0):
@@ -36,15 +37,8 @@ def create_back_button(game, canvas, topleft_position, color=pygame.Color("white
     # Import here to avoid circular dependency
     from UI.Button import ImageButton
 
-    img = pygame.image.load(os.path.join(UI_PATH, "back_arr_h20px.png")).convert_alpha()
-    # Create a mask from the alpha channel
-    alpha = pygame.surfarray.array_alpha(img).copy()
-
-    # Fill with the new color (this replaces all pixels)
-    img.fill(color)
-
-    # Restore the original alpha channel
-    pygame.surfarray.pixels_alpha(img)[:] = alpha
+    img = pygame.image.load(os.path.join(UI_PATH, "back_arr_h20px.png"))
+    img = change_tint(img, pygame.Color("white"))
     back_button = ImageButton(
         canvas,
         x=topleft_position[0],

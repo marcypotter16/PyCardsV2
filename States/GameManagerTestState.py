@@ -1,15 +1,21 @@
+import os
+import pygame
 from Bot import Bot
+from Constants import ART_PATH, UI_PATH
 from GameManager import GameManager
 from PModels import Player, PlayerType
 from SocketManager import SocketManager
 from States.HistoryViewState import HistoryViewState
 from States.MainMenu import MainMenu
+from States.SettingsState import SettingsState
 from States.State import State
-from UI.Button import TextButton
+from UI.Button import ImageButton, TextButton
 from UI.Label import Label
 
 # from Utils.Timer import Timer
 from threading import Timer
+
+from Utils.Image import change_tint
 
 
 class OnlineGameManagerTestState(State):
@@ -95,6 +101,18 @@ class OfflineGameManagerTestState(State):
             ),
         )
         self.open_history.pack()
+        img = change_tint(
+            pygame.image.load(os.path.join(UI_PATH, "settings.png")),
+            pygame.Color("white"),
+        )
+        self.open_settings = ImageButton(
+            self.canvas,
+            center=(0.02 * game.GAME_W, 0.98 * game.GAME_H),
+            width=20,
+            height=20,
+            hover_animation=[img],
+            command=lambda: game.push_state(SettingsState(game, previous_state=self)),
+        )
 
     def state_machine(self):
         if self.gm.active_player == PlayerType.OP:

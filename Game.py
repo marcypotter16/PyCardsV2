@@ -1,6 +1,9 @@
 import math
+from numpy import array
 import os
 from typing import Dict
+
+import moderngl
 
 from Resolution import set_dpi_awareness
 from Settings import GameSettings
@@ -24,7 +27,7 @@ class Game:
     def __init__(self, workdir: str = os.getcwd(), use_shaders: bool = False):
         self.need_key_event_handling = True
         self.events = None
-        self.fps: int = 120
+        # self.fps: int = 120
         self.clock = p.time.Clock()
         self.font_dir = None
         self.assets_dir = None
@@ -49,11 +52,61 @@ class Game:
         )
         self.GAME_CENTER = (self.GAME_W / 2, self.GAME_H / 2)
         self.game_canvas = p.Surface((self.GAME_W, self.GAME_H))
+        # self.screen = p.display.set_mode(
+        #     (self.settings.SCREEN_W, self.settings.SCREEN_H), p.RESIZABLE
+        # )
         self.screen = p.display.set_mode(
-            (self.settings.SCREEN_W, self.settings.SCREEN_H), p.RESIZABLE
+            (self.settings.SCREEN_W, self.settings.SCREEN_H), p.RESIZABLE | p.OPENGL
         )
+
+        # ModernGL
+        self.glctx = moderngl.create_context()
+        self.glctx.enable(moderngl.BLEND)
+        self.glctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
+        self.game_texture = self.glctx.texture((self.GAME_W, self.GAME_H), 4)
+        self.game_texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
+        self.game_texture.repeat_x = False
+        self.game_texture.repeat_y = False
         self.game_to_screen_scale: int
         self.screen_to_game_scale: int
+        quad = array(
+            [
+                # x,  y,   u, v
+                -1.0,
+                -1.0,
+                0.0,
+                0.0,
+                1.0,
+                -1.0,
+                1.0,
+                0.0,
+                -1.0,
+                1.0,
+                0.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+            ],
+            dtype="f4",
+        )
+
+        self.vbo = self.glctx.buffer(quad.tobytes())
+        wspath = os.path.join(workdir, "window_scaling.glsl")
+        wsfrag = os.path.join(workdir, "window_scaling_frag.glsl")
+        with open(wspath, "r", encoding="utf-8") as f:
+            vertex_src = f.read()
+
+        with open(wsfrag, "r", encoding="utf-8") as f:
+            fragment_src = f.read()
+
+        prog = self.glctx.program(
+            vertex_shader=vertex_src,
+            fragment_shader=fragment_src,
+        )
+        self.vao = self.glctx.simple_vertex_array(prog, self.vbo, "in_pos", "in_uv")
+
         self._recompute_scaling()
 
         self.use_shaders = use_shaders
@@ -105,7 +158,7 @@ class Game:
             self.get_events()
             self.update()
             self.render()
-            self.clock.tick(self.fps)
+            self.clock.tick(self.settings.FPS)
 
     def get_events(self):
         self.events = p.event.get()
@@ -221,13 +274,20 @@ class Game:
             p.draw.circle(self.game_canvas, p.Color("black"), self.cursorpos, 8, 2)
 
         # scale GAME → SCREEN
-        p.transform.smoothscale(
-            self.game_canvas, self.scaled_size, self.scaled_game_canvas
-        )
+        # p.transform.smoothscale(
+        #     self.game_canvas, self.scaled_size, self.scaled_game_canvas
+        # )
+
+        # GPU scaling attempt 1
+        self.game_texture.write(p.image.tobytes(self.game_canvas, "RGBA", True))
+        self.glctx.clear(0.0, 0.0, 0.0, 1.0)
+        self.game_texture.use(0)
+        self.vao.render(moderngl.TRIANGLE_STRIP)
 
         # present
-        self.screen.fill(self.settings.LETTERBOX_COLOR)  # letterbox bars
-        self.screen.blit(self.scaled_game_canvas, self.game_canvas_offset)
+        # self.screen.fill(self.settings.LETTERBOX_COLOR)  # letterbox bars
+        # # self.screen.blit(self.scaled_game_canvas, self.game_canvas_offset)
+        # self.screen.blit(self.game_canvas, self.game_canvas_offset)
 
         if self.use_shaders:
             self.screen_shader.render()
@@ -242,7 +302,11 @@ class Game:
         col = p.Color(0, 255, 0)
         p.draw.rect(surf, col, rect, 1, 2)
         draw_centered_text(
-            self.fonts["ant"]["medium"], surf, f"fps: {self.fps}", col, rect
+            self.fonts["ant"]["medium"],
+            surf,
+            f"fps: {round(self.clock.get_fps())}",
+            col,
+            rect,
         )
         # self.game_canvas
 
@@ -419,9 +483,6 @@ class Game:
         pass
         # self.title_screen = Title(self)
         # self.state_stack.push(self.title_screen)
-
-    def load_state(self, state):
-        self.state_stack.push(state)
 
     def load_map(self):
         pass

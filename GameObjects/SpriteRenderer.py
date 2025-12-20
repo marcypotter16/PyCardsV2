@@ -5,7 +5,6 @@ import pygame as p
 import io
 
 # from Constants import CARD_DIMENSIONS, CARD_BASE_PATH
-from Utils.Image import surf_from_svg
 from Utils.Text import draw_centered_text
 
 
@@ -15,6 +14,7 @@ class SpriteRenderer(GameObject):
         parent: GameObject = None,
         image: p.Surface | str = None,
         dimensions: tuple[int, int] | p.Vector2 = None,
+        scale_img_to_dim: bool = True,
     ):
         """
         :param parent: The parent GameObject
@@ -42,9 +42,12 @@ class SpriteRenderer(GameObject):
         if self.sprite is not None:
             # Use smoothscale for better quality when resizing
             try:
-                self.sprite = self.__o_sprite = p.transform.smoothscale(
-                    self.sprite, self.dimensions
-                )
+                if scale_img_to_dim:
+                    self.sprite = self.__o_sprite = p.transform.smoothscale(
+                        self.sprite, self.dimensions
+                    )
+                else:
+                    self.dimensions = self.sprite.get_rect().size
             except ValueError:
                 # Fallback to regular scale if smoothscale fails
                 self.sprite = self.__o_sprite = p.transform.scale(
@@ -121,12 +124,6 @@ class SpriteRenderer(GameObject):
             self.rect.size = self.dimensions
             self.rect.center = self.transform.position
 
-    def set_sprite_from_svg(self, svg_path: str):
-        """Load an SVG file and convert it to a pygame surface"""
-
-        # Render SVG to PNG bytes at the desired dimensions
-        self.sprite = surf_from_svg(svg_path, self.dimensions)
-
     def scale_by(self, factor: float):
         self.transform.scale_by(factor)
         self.rect.scale_by(factor)
@@ -163,7 +160,9 @@ class SpriteRenderer(GameObject):
         if self.children:
             for c in self.children:
                 c.tween_pos(
-                    c.transform.position + p.Vector2(new_position) - self.transform.position
+                    c.transform.position
+                    + p.Vector2(new_position)
+                    - self.transform.position
                 )
         self.__is_moving = True
         self.parent.game.tweener_manager.add_tween(
@@ -224,6 +223,8 @@ class SpriteRenderer(GameObject):
         # Update the sprite
         self.__o_sprite = tex
         self.sprite = p.transform.scale(tex, self.dimensions)
+        del alpha
+        del tex
 
     def update(self, delta: float):
         if self.__is_rotating or self.__is_scaling:
