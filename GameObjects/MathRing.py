@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import Enum, StrEnum
 import math
 import os
 
@@ -24,24 +24,106 @@ def is_prime(n: int):
     return True
 
 
-class Ring(StrEnum):
+class AlgebraicStructure:
+    # Operation symbols for display
+    ADD_SYMBOL = "+"
+    MUL_SYMBOL = "·"
+
+    def __init__(self, name: str):
+        self.name = name
+
+    def has_addition(self) -> bool:
+        return False
+
+    def has_multiplication(self) -> bool:
+        return False
+
+    def get_operations(self) -> list[str]:
+        """Returns list of operation symbols this structure supports"""
+        ops = []
+        if self.has_addition():
+            ops.append(self.ADD_SYMBOL)
+        if self.has_multiplication():
+            ops.append(self.MUL_SYMBOL)
+        return ops
+
+    def get_display_string(self) -> str:
+        """Returns formatted string: 'structure, op1, op2'"""
+        ops = self.get_operations()
+        if ops:
+            return f"{self.name}, {', '.join(ops)}"
+        return self.name
+
+    def is_domain(self) -> bool:
+        return False
+
+    def __str__(self):
+        return self.name
+
+
+class AdditiveGroup(AlgebraicStructure):
+    OPERATIONS = set("+")
+
+    def has_addition(self) -> bool:
+        return True
+
+    def has_multiplication(self) -> bool:
+        return False
+
+
+class MultiplicativeGroup(AlgebraicStructure):
+    OPERATIONS = set(".")
+
+    def has_addition(self):
+        return False
+
+    def has_multiplication(self):
+        return True
+
+
+class Rings(StrEnum):
     Q = "QQ"
     Z = "ZZ"
     R = "RR"
     C = "CC"
     F = "FF"
     Fq = "FFq"
-    Zxmod = "ZZ[x]/"
 
 
-class PolyRingQuotient:
-    def __init__(self, base_ring: Ring, quotient_poly: str):
-        self.base_ring = base_ring
-        self.quotient_poly = quotient_poly
+class Ring(AdditiveGroup):
+    OPERATIONS = set(("+", "."))
+
+    def __init__(self, ring: Rings):
+        self.ring = ring
+
+    def has_multiplication(self) -> bool:
+        return True
+
+    def is_domain(self) -> bool:
+        return self.ring in (Rings.Z, Rings.Q)
+
+    def is_field(self) -> bool:
+        return self.name is Rings.Q
+
+    @property
+    def name(self):
+        return RING_DISPLAY[self.ring]
+
+    def __str__(self):
+        return self.name
 
 
-class Zn:
+RING_DISPLAY = {
+    Rings.Z: "ℤ",
+    Rings.Q: "ℚ",
+    Rings.R: "ℝ",
+    Rings.C: "ℂ",
+}
+
+
+class Zn(Ring):
     def __init__(self, n: int):
+        super().__init__(f"ℤ/{n}ℤ")
         self.n = n
 
     def is_domain(self) -> bool:
@@ -50,28 +132,45 @@ class Zn:
     def is_field(self) -> bool:
         return is_prime(self.n)
 
-    def get_invertibles(self) -> list[int]:
+    def units(self) -> list[int]:
         return [i for i in range(self.n) if math.gcd(i, self.n) == 1]
 
     def __str__(self):
-        return f"Z/{self.n}Z"
+        return f"ℤ/{self.n}ℤ"
+
+
+class UnitsGroup(MultiplicativeGroup):
+    def __init__(self, ring: Ring):
+        super().__init__(f"U({ring})")
+        self.base_ring = ring
+        self.elements = ring.units()
+
+
+class AutomorphismGroup(MultiplicativeGroup):
+    def __init__(self, structure: AlgebraicStructure):
+        super().__init__(f"Aut({structure})")
+        self.base_structure = structure
+
+        if isinstance(structure, Zn):
+            # Aut(Zn, +) ≅ U(Zn)
+            self.elements = structure.units()
+        else:
+            self.elements = []
 
 
 ring2sprite = {
-    Ring.Q: pygame.image.load(os.path.join(ART_PATH, "Q.png")),
-    Ring.Z: pygame.image.load(os.path.join(ART_PATH, "Z.png")),
-    Ring.R: pygame.image.load(os.path.join(ART_PATH, "R.png")),
-    Ring.F: pygame.image.load(os.path.join(ART_PATH, "F.png")),
-    # Ring.Q: os.path.join(ART_PATH, "Q.png"),
-    # Ring.Q: os.path.join(ART_PATH, "Q.png"),
+    Rings.Q: pygame.image.load(os.path.join(ART_PATH, "Q.png")),
+    Rings.Z: pygame.image.load(os.path.join(ART_PATH, "Z.png")),
+    Rings.R: pygame.image.load(os.path.join(ART_PATH, "R.png")),
+    Rings.F: pygame.image.load(os.path.join(ART_PATH, "F.png")),
 }
 quotring2sprite = {
-    Ring.Q: pygame.image.load(os.path.join(ART_PATH, "Q[x]mod.png")),
-    Ring.R: pygame.image.load(os.path.join(ART_PATH, "R[x]mod.png")),
-    Ring.C: pygame.image.load(os.path.join(ART_PATH, "C[x]mod.png")),
-    Ring.Z: pygame.image.load(os.path.join(ART_PATH, "Z[x]mod.png")),
-    Ring.F: pygame.image.load(os.path.join(ART_PATH, "F[x]mod.png")),
-    Ring.Fq: pygame.image.load(os.path.join(ART_PATH, "Fq[x]mod.png")),
+    Rings.Q: pygame.image.load(os.path.join(ART_PATH, "Q[x]mod.png")),
+    Rings.R: pygame.image.load(os.path.join(ART_PATH, "R[x]mod.png")),
+    Rings.C: pygame.image.load(os.path.join(ART_PATH, "C[x]mod.png")),
+    Rings.Z: pygame.image.load(os.path.join(ART_PATH, "Z[x]mod.png")),
+    Rings.F: pygame.image.load(os.path.join(ART_PATH, "F[x]mod.png")),
+    Rings.Fq: pygame.image.load(os.path.join(ART_PATH, "Fq[x]mod.png")),
 }
 
 poly_dict = {
@@ -79,6 +178,93 @@ poly_dict = {
     "+": pygame.image.load(os.path.join(ART_PATH, "plus.png")),
     "-": pygame.image.load(os.path.join(ART_PATH, "minus.png")),
 }
+
+
+def render_structure_with_ops(
+    structure: AlgebraicStructure,
+    game: Game,
+    font_group: str = "stix",
+    color: pygame.Color = pygame.Color("black"),
+    font_size: int = 24,
+    spacing: int = 8,
+) -> pygame.Surface:
+    """Render an algebraic structure with its operations.
+
+    Renders in format: "structure, op1, op2" where ops are the available operations.
+    For example: "U(Z/5Z), ·" or "ZZ, +, ·"
+
+    Args:
+        structure: The algebraic structure to render
+        game: Game instance for font access
+        font_group: Font family to use
+        color: Text color
+        font_size: Base font size
+        spacing: Horizontal spacing between elements
+
+    Returns:
+        A pygame surface with the rendered structure and operations
+    """
+    font = game.get_font(font_group, font_size)
+
+    # Get the display components
+    structure_name = str(structure)
+    operations = structure.get_operations()
+
+    # Render structure name
+    name_surf = font.render(structure_name, True, color)
+
+    if not operations:
+        return name_surf
+
+    # Render comma and operations
+    comma_surf = font.render(",", True, color)
+    op_surfs = [font.render(op, True, color) for op in operations]
+
+    # Calculate total width
+    total_width = name_surf.get_width()
+    total_width += comma_surf.get_width() + spacing  # First comma after name
+
+    for i, op_surf in enumerate(op_surfs):
+        total_width += op_surf.get_width()
+        if i < len(op_surfs) - 1:
+            total_width += comma_surf.get_width() + spacing  # Comma between ops
+
+    # Get max height
+    max_height = max(
+        name_surf.get_height(),
+        comma_surf.get_height(),
+        max(s.get_height() for s in op_surfs) if op_surfs else 0,
+    )
+
+    # Create final surface
+    surface = pygame.Surface((total_width, max_height), pygame.SRCALPHA)
+    surface.fill((0, 0, 0, 0))
+
+    # Blit elements
+    x = 0
+
+    # Structure name
+    y = (max_height - name_surf.get_height()) // 2
+    surface.blit(name_surf, (x, y))
+    x += name_surf.get_width()
+
+    # First comma
+    y = (max_height - comma_surf.get_height()) // 2
+    surface.blit(comma_surf, (x, y))
+    x += comma_surf.get_width() + spacing
+
+    # Operations with commas between them
+    for i, op_surf in enumerate(op_surfs):
+        y = (max_height - op_surf.get_height()) // 2
+        surface.blit(op_surf, (x, y))
+        x += op_surf.get_width()
+
+        if i < len(op_surfs) - 1:
+            y = (max_height - comma_surf.get_height()) // 2
+            surface.blit(comma_surf, (x, y))
+            x += comma_surf.get_width() + spacing
+
+    return surface
 
 
 def render_univariate_poly(
@@ -211,195 +397,100 @@ def render_univariate_poly(
     return surface
 
 
-class RingController(GameObject):
-    def __init__(self, game, parent=None, initial_scale=0.5):
-        super().__init__(game, parent)
-        self.ring: Ring | PolyRingQuotient | Zn = None
-        # Load Q.png at original size to avoid scaling artifacts
-        q_img = pygame.image.load(os.path.join(ART_PATH, "Q.png"))
-        original_size = q_img.get_size()
-        self.ring_sprite = SpriteRenderer(
-            self, os.path.join(ART_PATH, "Q.png"), original_size
-        )
-        self.ring_sprite.change_tint((255, 255, 255))
-        self.ring_sprite.TWEEN_DUR = CARD_TWEEN_DUR
-        # Create child sprite with a 1x1 transparent placeholder initially
-        self.quotient_poly_sprite = SpriteRenderer(self.ring_sprite)
-        self.quotient_poly_sprite.set_visible(False)
-        self.quotient_poly_sprite.TWEEN_DUR = CARD_TWEEN_DUR
-        self.n_sprite = SpriteRenderer(self.ring_sprite)
-        self.n_sprite.set_visible(False)
-        self.n_sprite.TWEEN_DUR = CARD_TWEEN_DUR
-        self.used_font = None
-        self.color = pygame.Color("black")
+class StructureController(GameObject):
+    """Controller for rendering any AlgebraicStructure with its operations.
 
-        # Scale down the ring to fit better on cards
+    Displays structure in format: "structure, op1, op2"
+    For example: "U(Z/5Z), ·" or "ZZ, +, ·"
+    """
+
+    def __init__(self, game, parent=None, initial_scale=1.0):
+        super().__init__(game, parent)
+        self.structure: AlgebraicStructure = None
+        self.used_font = "ant"
+        self.color = pygame.Color("black")
+        self.font_size = int(24 * initial_scale)
+
+        # Main sprite for the entire structure display
+        self.structure_sprite = SpriteRenderer(self)
+        self.structure_sprite.TWEEN_DUR = CARD_TWEEN_DUR
+
+        # Scale down to fit on cards
         if initial_scale != 1.0:
             self.transform.scale_by(initial_scale)
-            self.scale_by(initial_scale)
+
+    def set_structure(
+        self,
+        structure: AlgebraicStructure,
+        font_family: str = "stix",
+        color: pygame.Color = pygame.Color("black"),
+    ):
+        """Set the algebraic structure to display.
+
+        Args:
+            structure: Any AlgebraicStructure (Ring, Zn, UnitsGroup, AutomorphismGroup, etc.)
+            font_family: Font to use for rendering
+            color: Text color
+            font_size: Base font size
+        """
+        self.structure = structure
+        self.used_font = font_family
+        self.color = color
+
+        # Render the structure with its operations
+        surf = render_structure_with_ops(
+            structure,
+            self.game,
+            font_group=font_family,
+            color=color,
+            font_size=self.font_size,
+        )
+
+        self.structure_sprite.set_sprite_no_scale(surf)
+        self.structure_sprite.apply_scale()
 
     def is_domain(self) -> bool:
-        """Check if the current ring is an integral domain"""
-        match self.ring:
-            case Ring():
-                return True  # Q, Z, R, C, F are all domains
-            case Zn():
-                return self.ring.is_domain()  # Z/nZ is a domain iff n is prime
-            case PolyRingQuotient():
-                return False  # Would need to check if quotient poly is irreducible
-            case _:
-                return False
+        return self.structure.is_domain()
 
     def set_color(self, new_color: pygame.Color):
         self.color = new_color
-        self.set_ring(self.ring, self.used_font, self.color)
-
-    def set_ring(
-        self,
-        new_ring: Ring | PolyRingQuotient | Zn,
-        font_family="ant",
-        color: pygame.Color = pygame.Color("black"),
-        scale: bool = False,
-    ):
-        self.ring = new_ring
-        self.used_font = font_family
-        if isinstance(new_ring, Ring):
-            self.ring_sprite.set_sprite_no_scale(ring2sprite[new_ring])
-            self.ring_sprite.change_tint(color)
-            # Hide the quotient polynomial sprite for simple rings
-            self.quotient_poly_sprite.set_visible(False)
-            self.n_sprite.set_visible(False)
-
-        elif isinstance(new_ring, PolyRingQuotient):
-            self.ring_sprite.set_sprite_no_scale(quotring2sprite[new_ring.base_ring])
-
-            # Calculate desired height for the polynomial (50% of ring sprite height)
-            desired_poly_height = int(self.ring_sprite.dimensions[1] * 0.5)
-
-            poly_surf = render_univariate_poly(
-                new_ring.quotient_poly,
-                self.game,
-                font_family,
-                add_parens=True,
-                target_height=desired_poly_height,
-            )
-            self.quotient_poly_sprite.set_sprite_no_scale(poly_surf)
-            self.quotient_poly_sprite.set_visible(True)
-            self.quotient_poly_sprite.change_tint(color)
-
-            # Position the polynomial to the right of the ring symbol
-            ring_width = self.ring_sprite.dimensions[0]
-            poly_width = poly_surf.get_width()
-
-            # Calculate position relative to parent's current position
-            # Place it to the right of the ring
-            offset_x = ring_width / 2 + poly_width / 2 - 5
-            absolute_pos = self.ring_sprite.transform.position + pygame.Vector2(
-                offset_x, 20
-            )
-
-            self.quotient_poly_sprite.move(absolute_pos)
-            self.n_sprite.set_visible(False)
-
-        elif isinstance(new_ring, Zn):
-            self.ring_sprite.set_sprite_no_scale(ring2sprite[Ring.Z])
-            self.ring_sprite.apply_scale()  # Apply scale first so dimensions are correct
-            self.quotient_poly_sprite.set_visible(False)
-            self.n_sprite.set_visible(True)
-
-            # Calculate subscript font size (about 60% of ring height)
-            ring_height = self.ring_sprite.dimensions[1]
-            subscript_font_size = int(max(10, ring_height * 0.5))
-
-            # Render the subscript
-            n_surf = self.game.get_font(font_family, subscript_font_size).render(
-                str(new_ring.n), True, color
-            )
-            self.n_sprite.set_sprite_no_scale(n_surf)
-
-            # Position subscript: bottom-right of the Z, slightly offset
-            ring_width = self.ring_sprite.dimensions[0]
-            n_width = n_surf.get_width()
-
-            # Calculate position relative to ring sprite center
-            # Use ratios so it works at any scale
-            offset_x = ring_width * 0.5 + n_width / 2  # Position to the right
-            offset_y = ring_height * 0.4  # Subscript position (below center)
-
-            absolute_pos = self.ring_sprite.transform.position + pygame.Vector2(
-                offset_x, offset_y
-            )
-            self.n_sprite.move(absolute_pos)
-        # if color != self.color:
-        self.ring_sprite.change_tint(color)
-        # Reapply current scale after setting sprite
-        self.ring_sprite.apply_scale()
+        if self.structure:
+            self.set_structure(self.structure, self.used_font, new_color)
 
     def scale_by(self, factor):
         super().scale_by(factor)
-        self.set_ring(
-            self.ring,
-            self.used_font if self.used_font is not None else "ant",
-            self.color,
-        )
+        self.structure_sprite.scale_by(factor)
+
+    def tween_pos(self, new_position):
+        """Tween position of the structure"""
+        super().tween_pos(new_position)
+        self.structure_sprite.tween_pos(new_position)
 
     def tween_scale_to(self, new_scale, target_position=None):
-        """Tween the scale of the ring to match card scaling
-
-        Args:
-            new_scale: The target scale factor
-            target_position: Optional target position for the ring. If None, uses current position.
-        """
         if target_position is None:
-            target_position = self.ring_sprite.transform.position
+            target_position = self.structure_sprite.transform.position
 
-        # Tween the main ring sprite scale and position
-        self.ring_sprite.tween_scale_to(new_scale)
-        self.ring_sprite.tween_pos(target_position)
+        self.structure_sprite.tween_scale_to(new_scale)
+        self.structure_sprite.tween_pos(target_position)
 
-        # Calculate scale ratio to determine new child positions
-        current_scale = self.transform.scale
-        if current_scale == 0:
-            current_scale = 0.001  # Avoid division by zero
-        scale_ratio = new_scale / current_scale
-
-        # Update transform scale (for future calculations)
         self.game.tweener_manager.add_tween(
             self.transform,
             "scale",
             to_=new_scale,
-            duration=self.ring_sprite.TWEEN_DUR,
+            duration=self.structure_sprite.TWEEN_DUR,
         )
-
-        # Handle child sprites based on ring type
-        if isinstance(self.ring, Zn) and self.n_sprite.is_visible:
-            # Calculate new position for n_sprite relative to ring
-            current_offset = (
-                self.n_sprite.transform.position - self.ring_sprite.transform.position
-            )
-            new_offset = current_offset * scale_ratio
-            new_n_pos = target_position + new_offset
-            self.n_sprite.tween_pos(new_n_pos)
-            # Scale the n_sprite font by tweening (we'll re-render at final scale)
-            self.n_sprite.tween_scale_to(scale_ratio)
-
-        elif (
-            isinstance(self.ring, PolyRingQuotient)
-            and self.quotient_poly_sprite.is_visible
-        ):
-            # Calculate new position for quotient poly sprite
-            current_offset = (
-                self.quotient_poly_sprite.transform.position
-                - self.ring_sprite.transform.position
-            )
-            new_offset = current_offset * scale_ratio
-            new_poly_pos = target_position + new_offset
-            self.quotient_poly_sprite.tween_pos(new_poly_pos)
-            self.quotient_poly_sprite.tween_scale_to(scale_ratio)
 
 
 if __name__ == "__main__":
     # for i in range(20):
     #     print(f"{i}: {is_prime(i)}")
     z20 = Zn(20)
-    print(z20.get_invertibles())
+    print(z20.units())
+    R = Ring(Rings.Z)
+
+    print(R)  # ℤ
+    print(R.is_domain())  # True
+    print(R.is_field())  # False
+
+    if R.ring is Rings.Z:
+        print("Integers detected")

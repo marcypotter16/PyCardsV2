@@ -1,9 +1,9 @@
-from GameObjects.Card import Card, CardTag, ChangeRingCard, SpellCard
+from GameObjects.Card import Card, CardTag, ChangeStructureCard, SpellCard
 from GameObjects.EffectContext import EffectContext
 from Constants import ART_PATH
 import os
 
-from GameObjects.MathRing import Ring, Zn
+from GameObjects.MathRing import Ring, Rings, Zn
 
 # print(ART_PATH)
 
@@ -43,16 +43,21 @@ def mvn_trigger(ctx: EffectContext):
 
 
 def plus_1_on_play(ctx: EffectContext):
-    if isinstance(ctx.game_manager.ring, Zn):
-        ctx.game_manager.ring.set_ring(Zn(ctx.game_manager.ring.ring.n + 1))
+    if isinstance(ctx.game_manager.structure, Zn):
+        ctx.game_manager.structure.set_ring(Zn(ctx.game_manager.structure.ring.n + 1))
 
 
 def frobenius_on_play(ctx: EffectContext):
-    if ctx.game_manager.ring.is_domain():
+    if ctx.game_manager.structure.is_domain():
         ctx.source_card.change_power(ctx.source_card.current_power * 2)
 
 
 def frobenius_trigger(ctx: EffectContext):
+    pass
+
+
+def galois_on_play(ctx: EffectContext):
+    # ctx.game_manager.structure.set_ring()
     pass
 
 
@@ -78,19 +83,26 @@ CARD_DATABASE = {
         description="If present, adds 1 to the modulus (e.g. Z2 becomes Z3)",
         effects={"on_play": [plus_1_on_play]},
     ),
-    "Z": ChangeRingCard(Ring.Z),
-    "Q": ChangeRingCard(Ring.Q),
+    "Z": ChangeStructureCard(Ring(Rings.Z)),
+    "Q": ChangeStructureCard(Ring(Rings.Q)),
     "frobenius": Card(
         "Frobenius",
-        None,
+        os.path.join(ART_PATH, "Frobenius1.png"),
         tags=[CardTag.HUMAN, CardTag.SCIENCE],
         effects={"on_play": [frobenius_on_play], "trigger": [frobenius_trigger]},
-        description="When played doubles its power, if the Frobenius endomorphism of the current active Ring is injective (i.e. the Ring is an Integral Domain). (TBI) If this card is in the field (TBC in any place) and the active Ring is changed to a Domain, gain 1 power. If it gets changed to a non Domain lose 1.",
-        base_power=3,
+        description="When played doubles its power, if the Current Active Structure is a Ring and its Frobenius endomorphism is injective. (TBI) If this card is in the field (TBC in any place) and the Active Structure is changed to a Domain, gain 1 power. If it gets changed to a non Domain lose 1.",
+        base_power=6,
+    ),
+    "galois": Card(
+        "Galois",
+        os.path.join(ART_PATH, "Galois.png"),
+        tags=[CardTag.HUMAN, CardTag.SCIENCE],
+        effects={"on_play": [galois_on_play]},
+        description="Change the Current Active Structure R to Aut(R), its group of automorphisms. (HANDLE WITH CARE)",
     ),
 }
 for i in range(2, 21):
-    CARD_DATABASE[f"Z{i}"] = ChangeRingCard(Zn(i))
+    CARD_DATABASE[f"Z{i}"] = ChangeStructureCard(Zn(i))
 
 
 DECK_DATABASE = {"base_deck": [{"Maire von Neumann": 10}]}

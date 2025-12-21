@@ -333,6 +333,7 @@ class Game:
             "october_crow": ("October Crow.ttf", [50, 26, 18, 12]),
             "press_start": ("PressStart.ttf", [30, 16, 10, 6]),
             "ant": ("AntykwaTorunska-Regular.otf", [45, 25, 20, 10]),
+            "stix": ("STIXTwoMath-Regular.otf", [0, 0, 0, 0]),
         }
 
         sizes = ["big", "medium", "small", "tiny"]

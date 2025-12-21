@@ -16,7 +16,14 @@ from Constants import (
 
 # from GameObjects.Database import CARD_DATABASE
 from GameObjects.GameObject import GameObject
-from GameObjects.MathRing import Ring, RingController, Zn
+from GameObjects.MathRing import (
+    AlgebraicStructure,
+    AutomorphismGroup,
+    Rings,
+    StructureController,
+    UnitsGroup,
+    Zn,
+)
 from PModels import EventKind, PHistoryEvent, PlayerType
 from GameObjects.SpriteRenderer import SpriteRenderer
 import math
@@ -71,29 +78,42 @@ class SpellCard(BaseCard):
         self.art_path = art_path
 
 
-def on_change_ring_card_play(ctx: "EffectContext"):
-    ctx.game_state.active_ring = ctx.source_card.card_model.ring
-    ctx.game_manager.ring.set_ring(
-        ctx.source_card.card_model.ring, color=ctx.game_manager.ring.color
+def on_change_structure_card_play(ctx: "EffectContext"):
+    ctx.game_state.active_structure = ctx.source_card.card_model.structure
+    ctx.game_manager.structure.set_structure(
+        ctx.source_card.card_model.structure, color=ctx.game_manager.structure.color
     )
 
 
-class ChangeRingCard(BaseCard):
-    """A card that changes the active ring"""
+class ChangeStructureCard(BaseCard):
+    """A card that changes the active algebraic structure"""
 
-    def __init__(self, ring: Ring | Zn, owner: str = PlayerType.ME):
-        name = ring.value if isinstance(ring, Ring) else f"Z{ring.n}"
-        description = f"Changes current active ring to {str(ring)}"
-        if isinstance(ring, Zn):
-            description += f" (the integers mod {ring.n})"
+    def __init__(self, structure: AlgebraicStructure, owner: str = PlayerType.ME):
+        # Generate name based on structure type
+        if isinstance(structure, Rings):
+            name = structure.value.name
+        elif isinstance(structure, Zn):
+            name = f"Z{structure.n}"
+        elif isinstance(structure, UnitsGroup):
+            name = f"U({structure.base_ring})"
+        elif isinstance(structure, AutomorphismGroup):
+            name = f"Aut({structure.base_structure})"
+        else:
+            name = str(structure)
+
+        # Generate description
+        ops = structure.get_operations()
+        ops_str = ", ".join(ops) if ops else "no operations"
+        description = f"Changes active structure to {structure} ({ops_str})"
+
         super().__init__(
             name=name,
             tags=[CardTag.CHANGE_RING],
-            effects={"on_play": [on_change_ring_card_play]},
+            effects={"on_play": [on_change_structure_card_play]},
             description=description,
             owner=owner,
         )
-        self.ring = ring
+        self.structure = structure
 
 
 class Card(SpellCard):
@@ -134,7 +154,7 @@ class CardControllerBase(GameObject):
         raise NotImplementedError("from_card must be implemented by subclass")
 
     def tween_pos(self, pos, drop=True, on_finish=None):
-        print(f"[tween_pos] {self.name}: to {pos}, drop={drop}, on_finish={on_finish}")
+        # print(f"[tween_pos] {self.name}: to {pos}, drop={drop}, on_finish={on_finish}")
 
         for c in self.children:
             # Skip children that manage their own position (e.g., power_text_sprite)
@@ -143,11 +163,11 @@ class CardControllerBase(GameObject):
             c.tween_pos(c.transform.position + pos - self.transform.position)
 
         def _on_finish_wrapper():
-            print(f"[tween_pos] {self.name}: _on_finish_wrapper called!")
+            # print(f"[tween_pos] {self.name}: _on_finish_wrapper called!")
             if drop:
                 self.drop()
             if on_finish:
-                print(f"[tween_pos] {self.name}: calling user on_finish")
+                # print(f"[tween_pos] {self.name}: calling user on_finish")
                 on_finish()
 
         self.game.tweener_manager.add_tween(
@@ -210,44 +230,50 @@ class CardControllerBase(GameObject):
 
 
 class CardController(CardControllerBase):
+    # Diamond size as ratio of card width
+    DIAMOND_SIZE_RATIO = 0.35
+
     def __init__(self, game, parent=None, card_model: BaseCard | None = None):
         super().__init__(game, parent, card_model)
-        self.base_sprite: SpriteRenderer = SpriteRenderer(
-            self,
-            (
-                CARD_BASE_PATH_1
-                if card_model and card_model.owner == PlayerType.ME
-                else CARD_BASE_PATH_2
-            ),
-            CARD_DIMENSIONS,
-        )
-        self.art_sprite = SpriteRenderer(self)
-        self.art_sprite.set_dim(CARD_ART_SIZE_RATIO * CARD_DIMENSIONS)
 
-        self.power_text_font_size = 30
+        # Full art - same dimensions as card
+        self.art_sprite = SpriteRenderer(self)
+        self.art_sprite.set_dim(CARD_DIMENSIONS)
+
+        # Diamond sprite for power background (bottom-right corner)
+        diamond_size = int(CARD_DIMENSIONS.x * self.DIAMOND_SIZE_RATIO)
+        self.diamond_offset = p.Vector2(
+            CARD_DIMENSIONS.x * 0.35, CARD_DIMENSIONS.y * 0.35  # Right side  # Bottom
+        )
+        diamond_path = os.path.join(ART_PATH, "diamond.png")
+        self.diamond_sprite = SpriteRenderer(
+            self, diamond_path, (diamond_size, diamond_size)
+        )
+
+        # Power text centered on diamond
+        self.power_text_font_size = 20
         self.power_text_surf = self.game.get_font(
             "ant", self.power_text_font_size
         ).render("0", False, p.Color(255, 255, 255))
+        self.power_text_offset = self.diamond_offset  # Same position as diamond
         self.power_text_sprite = SpriteRenderer(
             self, self.power_text_surf, scale_img_to_dim=False
         )
-
-        # Store the initial offset from card center for scaling
-        # self.power_text_offset = -0.5 * CARD_DIMENSIONS + p.Vector2(5, 5)
-        self.power_text_offset = p.Vector2(0, 0)
         self.power_text_sprite.move(self.power_text_offset)
+        self.diamond_sprite.move(self.diamond_offset)
 
         for c in self.children:
             c.TWEEN_DUR = CARD_TWEEN_DUR
+
         self.back_sprite: SpriteRenderer = SpriteRenderer(
             self, CARD_BACK_PATH, CARD_DIMENSIONS
         )
         self.back_sprite.set_visible(False)
-        self.base_sprite.setup_mb(True, 3)
         self.art_sprite.setup_mb(True, 3)
 
         self.face_up = True
-        self.rect = self.base_sprite.rect
+        self.rect = p.Rect((0, 0), CARD_DIMENSIONS)
+        self.rect.center = self.transform.position
         self.current_power: int = 0  # Will be set when from_card is called
         self.base_power: int = 0
 
@@ -268,8 +294,8 @@ class CardController(CardControllerBase):
         )
 
     def _should_skip_child_tween(self, child):
-        """Skip power_text_sprite during position tweening - its position is managed by tween_scale_to"""
-        return child is self.power_text_sprite
+        """Skip sprites with custom offsets during position tweening - their positions are managed separately"""
+        return child in (self.power_text_sprite, self.diamond_sprite)
 
     def change_power(self, new_power: int):
         match True:
@@ -291,16 +317,16 @@ class CardController(CardControllerBase):
         self.face_up = not self.face_up
         self.back_sprite.set_visible(not self.face_up)
         self.art_sprite.set_visible(self.face_up)
-        self.base_sprite.set_visible(self.face_up)
+        # self.base_sprite.set_visible(self.face_up)
 
     def rotate(self, angle: float):
         super().rotate(angle)
 
-    def face_mouse(self):
-        vec = self.game.cursorpos - self.base_sprite.position
-        angle = -math.atan2(vec.y, vec.x)
-        angle = math.degrees(angle)
-        self.rotate(angle)
+    # def face_mouse(self):
+    #     vec = self.game.cursorpos - self.base_sprite.position
+    #     angle = -math.atan2(vec.y, vec.x)
+    #     angle = math.degrees(angle)
+    #     self.rotate(angle)
 
     def from_card(self, card: Card):
         """Initialize card from Card data model
@@ -313,38 +339,43 @@ class CardController(CardControllerBase):
         self.base_power = card.base_power
         self.current_power = card.base_power  # Initialize current_power to base_power
 
-        self.change_power(card.base_power)
+        # Set up full art sprite
         self.art_path = card.art_path
         if card.art_path is not None:
             self.art_sprite.set_sprite(p.image.load(self.art_path))
         else:
-            placeholder = p.Surface(self.art_sprite.dimensions)
+            placeholder = p.Surface((int(CARD_DIMENSIONS.x), int(CARD_DIMENSIONS.y)))
             placeholder_color = p.Color("pink")
             placeholder.fill(placeholder_color)
             self.art_sprite.set_sprite(placeholder)
 
+        # Position diamond and power text
+        self.diamond_sprite.move(self.transform.position + self.diamond_offset)
+        self.change_power(card.base_power)
+        self.power_text_sprite.move(self.transform.position + self.power_text_offset)
+
     def tween_pos(self, pos, drop=True, on_finish=None):
         super().tween_pos(pos, drop, on_finish)
         self.power_text_sprite.tween_pos(pos + self.power_text_offset)
+        self.diamond_sprite.tween_pos(pos + self.diamond_offset)
 
     def tween_pos_and_scale(self, new_pos, new_scale: float, drop=True, on_finish=None):
         """Tween both position and scale together"""
         super().tween_pos_and_scale(new_pos, new_scale, drop, on_finish)
         new_pos = p.Vector2(new_pos)
 
-        # Debug
-        print(
-            f"[tween_pos_and_scale] card {self.name}: pos {self.transform.position} -> {new_pos}, scale {self.transform.scale} -> {new_scale}"
-        )
-        # Tween sprite positions and scales
-        self.base_sprite.tween_pos(new_pos)
-        self.base_sprite.tween_scale_to(new_scale)
+        # Art sprite (full card, no offset)
         self.art_sprite.tween_pos(new_pos)
         self.art_sprite.tween_scale_to(new_scale)
 
-        # Power text with scaled offset
-        scaled_offset = self.power_text_offset * new_scale
-        self.power_text_sprite.tween_pos(new_pos + scaled_offset)
+        # Diamond with scaled offset
+        scaled_diamond_offset = self.diamond_offset * new_scale
+        self.diamond_sprite.tween_pos(new_pos + scaled_diamond_offset)
+        self.diamond_sprite.tween_scale_to(new_scale)
+
+        # Power text with scaled offset (same as diamond)
+        scaled_power_offset = self.power_text_offset * new_scale
+        self.power_text_sprite.tween_pos(new_pos + scaled_power_offset)
 
     def tween_scale_to(self, new_scale):
         """Tweens the scale value from the current to the desired one
@@ -359,12 +390,30 @@ class CardController(CardControllerBase):
             duration=CARD_TWEEN_DUR,
         )
         self.art_sprite.tween_scale_to(new_scale)
-        self.base_sprite.tween_scale_to(new_scale)
 
-        # Scale the offset and add to the target card position
-        scaled_offset = self.power_text_offset * new_scale
-        power_text_target = self.transform.position + scaled_offset
-        self.power_text_sprite.tween_pos(power_text_target)
+        # Diamond with scaled offset
+        scaled_diamond_offset = self.diamond_offset * new_scale
+        self.diamond_sprite.tween_pos(self.transform.position + scaled_diamond_offset)
+        self.diamond_sprite.tween_scale_to(new_scale)
+
+        # Power text with scaled offset
+        scaled_power_offset = self.power_text_offset * new_scale
+        self.power_text_sprite.tween_pos(self.transform.position + scaled_power_offset)
+
+    def render(self, surface):
+        p.draw.rect(surface, p.Color("white"), self.rect, width=1, border_radius=4)
+        super().render(surface)
+        # p.draw.circle(
+        #     surface,
+        #     p.Color("white"),
+        #     self.power_text_sprite.rect.center,
+        #     self.power_circle_radius,
+        #     width=1,
+        # )
+
+    def update(self, delta):
+        super().update(delta)
+        self.rect.center = self.transform.position
 
 
 class SpellCardController(CardControllerBase):
@@ -562,36 +611,44 @@ class SpellCardController(CardControllerBase):
             )
 
 
-class ChangeRingCardController(CardControllerBase):
-    def __init__(self, game, parent=None, bg_image="BG2.png", ring: Ring | Zn = Ring.Q):
-        """This is a full art version"""
+class ChangeStructureCardController(CardControllerBase):
+    def __init__(
+        self,
+        game,
+        parent=None,
+        bg_image="BG2.png",
+        structure: AlgebraicStructure = None,
+    ):
+        """Controller for cards that change the active algebraic structure"""
         super().__init__(game, parent)
-        # Load the background image for the spell card
+        # Load the background image for the card
         bg_path = os.path.join(ART_PATH, bg_image)
         self.base_sprite: SpriteRenderer = SpriteRenderer(
             self, bg_path, CARD_DIMENSIONS
         )
-        self.initial_ring_scale = 0.4
-        self.ring = RingController(game, self, initial_scale=self.initial_ring_scale)
-        self.ring_offset = p.Vector2(0, -0.18 * CARD_DIMENSIONS[1])
-        self.from_card(ChangeRingCard(ring))
-        self.ring.move(self.ring.transform.position + self.ring_offset)
+        self.initial_structure_scale = 1.0
+        self.structure_controller = StructureController(
+            game, self, initial_scale=self.initial_structure_scale
+        )
+        self.structure_offset = p.Vector2(0, -0.18 * CARD_DIMENSIONS[1])
+
+        # Initialize with provided structure or default
+        if structure is not None:
+            self.from_card(ChangeStructureCard(structure))
+        self.structure_controller.move(
+            self.structure_controller.transform.position + self.structure_offset
+        )
 
         self.base_sprite.setup_mb(True, 3)
         self.base_sprite.TWEEN_DUR = CARD_TWEEN_DUR
         self.rect = self.base_sprite.rect
 
-    def from_card(self, card: ChangeRingCard):
-        """Initialize spell card from SpellCard data model"""
+    def from_card(self, card: ChangeStructureCard):
+        """Initialize card from ChangeStructureCard data model"""
         self.card_model = card
         self.name = card.name
         self.description = card.description
-        self.ring.set_ring(card.ring)
-        if isinstance(card.ring, Zn):
-            self.ring.move(
-                self.ring.transform.position + p.Vector2(-CARD_DIMENSIONS[0] * 0.085, 0)
-            )
-        # self.ring.set_color(p.Color("grey"))
+        self.structure_controller.set_structure(card.structure)
 
     def tween_scale_to(self, new_scale, target_card_position=None):
         """Tweens the scale value from the current to the desired one
@@ -611,20 +668,20 @@ class ChangeRingCardController(CardControllerBase):
         )
         self.base_sprite.tween_scale_to(new_scale)
 
-        # Calculate ring's target position based on card's target position
-        # ring_offset is scaled proportionally with the card
-        scaled_ring_offset = self.ring_offset * new_scale
-        ring_target_pos = target_card_position + scaled_ring_offset
-        self.ring.tween_scale_to(
-            new_scale * self.initial_ring_scale, target_position=ring_target_pos
+        # Calculate structure's target position based on card's target position
+        scaled_structure_offset = self.structure_offset * new_scale
+        structure_target_pos = target_card_position + scaled_structure_offset
+        self.structure_controller.tween_scale_to(
+            new_scale * self.initial_structure_scale,
+            target_position=structure_target_pos,
         )
 
     def tween_pos_and_scale(self, new_pos, new_scale, drop=True, on_finish=None):
         super().tween_pos_and_scale(new_pos, new_scale, drop, on_finish)
         self.base_sprite.tween_pos(new_pos)
         self.base_sprite.tween_scale_to(new_scale)
-        self.ring.tween_pos(new_pos)
-        self.ring.tween_scale_to(new_scale)
+        self.structure_controller.tween_pos(new_pos)
+        self.structure_controller.tween_scale_to(new_scale)
 
 
 def create_card_controller(
@@ -634,18 +691,20 @@ def create_card_controller(
 
     Args:
         game: The game instance
-        card: Card or SpellCard data model
+        card: Card, SpellCard, or ChangeStructureCard data model
         parent: Optional parent GameObject
         bg_image: Background image for spell cards (default: GreenBG1.png)
 
     Returns:
-        CardController for Card instances, SpellCardController for SpellCard instances
+        Appropriate CardController subclass for the card type
     """
     if isinstance(card, Card):
         controller = CardController(game, parent)
-    elif isinstance(card, SpellCard):  # SpellCard
+    elif isinstance(card, ChangeStructureCard):
+        controller = ChangeStructureCardController(game, parent, bg_image)
+    elif isinstance(card, SpellCard):
         controller = SpellCardController(game, parent, bg_image)
-    elif isinstance(card, ChangeRingCard):
-        controller = ChangeRingCardController(game, parent, bg_image)
+    else:
+        raise ValueError(f"Unknown card type: {type(card)}")
     controller.from_card(card)
     return controller

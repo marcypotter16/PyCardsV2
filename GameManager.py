@@ -11,7 +11,7 @@ from GameObjects.Card import (
     Card,
     CardController,
     CardControllerBase,
-    ChangeRingCardController,
+    ChangeStructureCardController,
     SpellCardController,
 )
 from GameObjects.Database import CARD_DATABASE
@@ -20,7 +20,7 @@ from GameObjects.EffectContext import EffectContext
 from GameObjects.GameObject import GameObject
 from GameObjects.Graveyard import GraveyardController
 from GameObjects.Hand import HandController
-from GameObjects.MathRing import Ring, RingController
+from GameObjects.MathRing import Ring, Rings, StructureController
 from States.GraveyardViewState import GraveyardViewState
 from States.CardDetailedView import CardDetailedView
 import pygame as p
@@ -55,7 +55,7 @@ class GameManager(GameObject):
         self.deck_me = DeckController(self.game, self)
         self.deck_op = DeckController(self.game, self)
         self.gy = GraveyardController(self.game, self)
-        self.ring = RingController(self.game, self)
+        self.structure = StructureController(self.game, self, initial_scale=2.0)
         self.history: List[PHistoryEvent] = []
         self.debug = True
         self._should_snap_back = True
@@ -89,9 +89,9 @@ class GameManager(GameObject):
         self.opponent_card_in_progress = (
             False  # Track if opponent is currently playing a card
         )
-        self.ring.set_ring(Ring.Z)
-        self.ring.set_color(p.Color("white"))
-        self.ring.move(
+        self.structure.set_structure(Ring(Rings.Z))
+        self.structure.set_color(p.Color("white"))
+        self.structure.move(
             0.5 * (self.deck_me.transform.position + self.deck_op.transform.position)
         )
         if self.debug:
@@ -162,7 +162,7 @@ class GameManager(GameObject):
             self.dragged_card = None
             return
         if isinstance(
-            self.dragged_card, (SpellCardController, ChangeRingCardController)
+            self.dragged_card, (SpellCardController, ChangeStructureCardController)
         ):
             # If card is back to hand dont play it
             if not self.hand_me.rect.collidepoint(self.game.cursorpos):
@@ -220,7 +220,7 @@ class GameManager(GameObject):
             )
         )
 
-        if isinstance(card, (SpellCardController, ChangeRingCardController)):
+        if isinstance(card, (SpellCardController, ChangeStructureCardController)):
             if card.card_model.effects.get("on_play"):
                 ctx = EffectContext(
                     game_state=self.get_game_state(),
@@ -402,7 +402,7 @@ class GameManager(GameObject):
             cards_in_gy_me=cards_in_gy_me,
             cards_in_gy_op=cards_in_gy_op,
             cards_in_deck_me=cards_in_deck_me,
-            active_ring=str(self.ring.ring),
+            active_structure=str(self.structure.structure),
         )
 
     def get_omni_game_state(self) -> OmniGameState:

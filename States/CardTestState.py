@@ -3,12 +3,12 @@ from Game import Game
 
 # from GameObjects.Card import Card, CardController
 from GameObjects.Database import CARD_DATABASE
-from GameObjects.MathRing import Ring, Zn
+from GameObjects.MathRing import Rings, Zn
 from GameObjects.Slot import SlotController
 from GameObjects.Card import (
     Card,
     CardController,
-    ChangeRingCardController,
+    ChangeStructureCardController,
     SpellCardController,
 )
 from States.CardDetailedView import CardDetailedView
@@ -34,11 +34,11 @@ class CardTestState(State):
         self.card2.from_card(CARD_DATABASE["plus_1"])
         # self.card2.tween_scale_to(1.0)
         self.card.from_card(card)
-        self.card3 = ChangeRingCardController(self.game, ring=Zn(27))
+        self.card3 = ChangeStructureCardController(self.game, ring=Zn(27))
         self.card3.move(
             self.card2.transform.position + p.Vector2(0, CARD_DIMENSIONS[1])
         )
-        self.card4 = ChangeRingCardController(self.game, ring=Ring.Z)
+        self.card4 = ChangeStructureCardController(self.game, ring=Rings.Z)
         self.card4.move(
             self.card2.transform.position + p.Vector2(CARD_DIMENSIONS[0], 0)
         )

@@ -2,7 +2,7 @@ from enum import StrEnum
 from typing import List, Optional
 from pydantic import BaseModel
 
-from GameObjects.MathRing import Ring, Zn
+from GameObjects.MathRing import Rings, Zn
 
 
 class PCardModel(BaseModel):
@@ -51,12 +51,12 @@ class PHistoryEvent(BaseModel):
 
         match self.kind:
             case EventKind.CARD_PLAYED_FROM_HAND:
-                return f"Turn {self.turn_number}: {player} played \"{self.card_name}\""
+                return f'Turn {self.turn_number}: {player} played "{self.card_name}"'
             case EventKind.CARD_DRAWN_FROM_DECK:
                 # Don't reveal opponent's drawn cards
                 if self.who_made_it == PlayerType.OP:
                     return f"Turn {self.turn_number}: {player} drew a card"
-                return f"Turn {self.turn_number}: {player} drew \"{self.card_name}\""
+                return f'Turn {self.turn_number}: {player} drew "{self.card_name}"'
             case _:
                 return f"Turn {self.turn_number}: {player} - {self.kind}"
 
@@ -81,7 +81,7 @@ class GameState(BaseModel):
     cards_in_gy_me: list[PCardModel]
     cards_in_gy_op: list[PCardModel]
     cards_in_deck_me: list[PCardModel]
-    active_ring: str
+    active_structure: str
 
 
 class OmniGameState(GameState):
