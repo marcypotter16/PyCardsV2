@@ -1,6 +1,6 @@
 from Game import Game
 from GameObjects.Board import Board
-from GameObjects.Card import Card
+from GameObjects.Card.Card import Card
 from GameObjects.Hand import HandController
 
 

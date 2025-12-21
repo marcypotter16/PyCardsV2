@@ -1,4 +1,4 @@
-from GameObjects.Card import CardController
+from GameObjects.Card.Card import CardController
 from GameObjects.Hand import HandController
 from States.State import State
 from Utils.Timer import SpacedCallback

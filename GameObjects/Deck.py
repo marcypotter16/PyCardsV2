@@ -3,7 +3,7 @@ import random
 
 import pygame
 from Constants import ART_PATH, CARD_BACK_PATH, CARD_DIMENSIONS
-from GameObjects.Card import BaseCard, Card
+from GameObjects.Card.Card import BaseCard, Card
 from GameObjects.GameObject import GameObject
 from PModels import PlayerType
 from GameObjects.SpriteRenderer import SpriteRenderer

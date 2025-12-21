@@ -3,7 +3,7 @@ from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from GameManager import GameManager
-    from GameObjects.Card import CardController
+    from GameObjects.Card.Card import CardController
     from GameObjects.Board import Board
     from GameObjects.Slot import SlotController
     from PModels import GameState

@@ -1,9 +1,18 @@
-from GameObjects.Card import Card, CardTag, ChangeStructureCard, SpellCard
+from GameObjects.Card.Card import Card, CardTag
+from GameObjects.Card.SpellCard import SpellCard
+from GameObjects.Card.ChangeStructureCard import ChangeStructureCard
 from GameObjects.EffectContext import EffectContext
 from Constants import ART_PATH
 import os
 
-from GameObjects.MathRing import Ring, Rings, Zn
+from GameObjects.MathRing import (
+    ISOMORPHISMS,
+    MAX_MODULUS,
+    AutomorphismGroup,
+    Ring,
+    Rings,
+    Zn,
+)
 
 # print(ART_PATH)
 
@@ -44,7 +53,9 @@ def mvn_trigger(ctx: EffectContext):
 
 def plus_1_on_play(ctx: EffectContext):
     if isinstance(ctx.game_manager.structure, Zn):
-        ctx.game_manager.structure.set_ring(Zn(ctx.game_manager.structure.ring.n + 1))
+        ctx.game_manager.structure.set_structure(
+            Zn(ctx.game_manager.structure.ring.n + 1)
+        )
 
 
 def frobenius_on_play(ctx: EffectContext):
@@ -57,8 +68,23 @@ def frobenius_trigger(ctx: EffectContext):
 
 
 def galois_on_play(ctx: EffectContext):
-    # ctx.game_manager.structure.set_ring()
-    pass
+    ctx.game_manager.structure.set_structure(
+        AutomorphismGroup(ctx.game_manager.structure.structure),
+        color=ctx.game_manager.structure.color,
+    )
+
+
+def iso_on_play(ctx: EffectContext):
+    # print(
+    #     ctx.game_manager.structure.structure,
+    #     ISOMORPHISMS.keys(),
+    #     ctx.game_manager.structure.structure in ISOMORPHISMS.keys(),
+    # )
+    if ctx.game_manager.structure.structure in ISOMORPHISMS.keys():
+        ctx.game_manager.structure.set_structure(
+            ISOMORPHISMS[ctx.game_manager.structure.structure],
+            color=ctx.game_manager.structure.color,
+        )
 
 
 CARD_DATABASE = {
@@ -77,7 +103,7 @@ CARD_DATABASE = {
     #     description="If present, multiplies quotienting polynomial by x",
     # ),
     "plus_1": SpellCard(
-        "plus 1",
+        "+1",
         art_path="plus_1.png",
         tags=[CardTag.SPELL, CardTag.SCIENCE],
         description="If present, adds 1 to the modulus (e.g. Z2 becomes Z3)",
@@ -100,8 +126,14 @@ CARD_DATABASE = {
         effects={"on_play": [galois_on_play]},
         description="Change the Current Active Structure R to Aut(R), its group of automorphisms. (HANDLE WITH CARE)",
     ),
+    "isomorphism": SpellCard(
+        "≅",
+        None,
+        effects={"on_play": [iso_on_play]},
+        description="If possible use a canonical isomorphism to change the current active structure",
+    ),
 }
-for i in range(2, 21):
+for i in range(2, MAX_MODULUS):
     CARD_DATABASE[f"Z{i}"] = ChangeStructureCard(Zn(i))
 
 
@@ -124,7 +156,7 @@ if __name__ == "__main__":
     # Need to create a minimal Game mock for testing
     from unittest.mock import MagicMock
     from GameObjects.Board import Board
-    from GameObjects.Card import CardController
+    from GameObjects.Card.Card import CardController
 
     # Initialize pygame for font rendering
     import pygame

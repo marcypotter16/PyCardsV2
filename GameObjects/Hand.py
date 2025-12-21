@@ -3,7 +3,8 @@ from Game import Game
 from Collections.Stack import Stack
 import pygame as p
 
-from GameObjects.Card import Card, CardControllerBase, create_card_controller
+from GameObjects.Card.Card import Card, CardControllerBase
+from Utils.UCard import create_card_controller
 from GameObjects.GameObject import GameObject
 from PModels import PlayerType
 

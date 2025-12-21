@@ -1,4 +1,4 @@
-from GameObjects.Card import create_card_controller
+from Utils.UCard import create_card_controller
 from GameObjects.Database import CARD_DATABASE
 from States.State import State
 import pygame as p

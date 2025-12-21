@@ -1,8 +1,8 @@
 from Constants import COLORS, SLOT_DIMENSIONS
 from Game import Game
-from GameObjects.Card import CardController
+from GameObjects.Card.Card import CardController
 from GameObjects.GameObject import GameObject
-from GameObjects.Card import Card
+from GameObjects.Card.Card import Card
 import pygame as p
 
 

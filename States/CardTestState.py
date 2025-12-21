@@ -5,12 +5,12 @@ from Game import Game
 from GameObjects.Database import CARD_DATABASE
 from GameObjects.MathRing import Rings, Zn
 from GameObjects.Slot import SlotController
-from GameObjects.Card import (
+from GameObjects.Card.Card import (
     Card,
     CardController,
-    ChangeStructureCardController,
-    SpellCardController,
 )
+from GameObjects.Card.SpellCard import SpellCardController
+from GameObjects.Card.ChangeStructureCard import ChangeStructureCardController
 from States.CardDetailedView import CardDetailedView
 from States.State import State
 import pygame as p

@@ -56,7 +56,9 @@ class Game:
         #     (self.settings.SCREEN_W, self.settings.SCREEN_H), p.RESIZABLE
         # )
         self.screen = p.display.set_mode(
-            (self.settings.SCREEN_W, self.settings.SCREEN_H), p.RESIZABLE | p.OPENGL
+            (self.settings.SCREEN_W, self.settings.SCREEN_H),
+            p.RESIZABLE | p.OPENGL | p.DOUBLEBUF,
+            vsync=0,
         )
 
         # ModernGL
@@ -108,13 +110,6 @@ class Game:
         self.vao = self.glctx.simple_vertex_array(prog, self.vbo, "in_pos", "in_uv")
 
         self._recompute_scaling()
-
-        self.use_shaders = use_shaders
-        self.screen_shader = (
-            ps.Shader(ps.DEFAULT_VERTEX_SHADER, "screen_frag.glsl", self.game_canvas)
-            if use_shaders
-            else None
-        )
         self.running, self.playing = True, True
         self.actions: dict[str, int] = {
             "left": 0,
@@ -219,7 +214,9 @@ class Game:
                         self.actions["start"] = 0
                 if event.type == p.VIDEORESIZE:
                     self.settings.SCREEN_W, self.settings.SCREEN_H = event.size
-                    self.screen = p.display.set_mode(event.size, p.RESIZABLE)
+                    self.screen = p.display.set_mode(
+                        event.size, p.RESIZABLE | p.OPENGL | p.DOUBLEBUF, vsync=0
+                    )
                     self._recompute_scaling()
             self.jump_action_changed = self.actions["jump"] - aux_prev_jump_action
         self.clicked_sx = self.actions["mouse_sx"] - aux_prev_mouse_sx
@@ -242,7 +239,14 @@ class Game:
             (self.settings.SCREEN_H - self.scaled_size[1]) // 2,
         )
 
-        self.scaled_game_canvas = p.Surface(self.scaled_size)
+        # Set OpenGL viewport for letterboxing (y is from bottom in OpenGL)
+        viewport_y = self.settings.SCREEN_H - self.game_canvas_offset[1] - self.scaled_size[1]
+        self.glctx.viewport = (
+            self.game_canvas_offset[0],
+            viewport_y,
+            self.scaled_size[0],
+            self.scaled_size[1],
+        )
 
     def update(self):
         # Convert screen mouse position to game coordinates, accounting for letterbox
@@ -289,8 +293,6 @@ class Game:
         # # self.screen.blit(self.scaled_game_canvas, self.game_canvas_offset)
         # self.screen.blit(self.game_canvas, self.game_canvas_offset)
 
-        if self.use_shaders:
-            self.screen_shader.render()
         p.display.flip()
 
     def print_stats(self, surf):

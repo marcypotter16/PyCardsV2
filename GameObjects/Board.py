@@ -2,7 +2,7 @@ import math
 from typing import List
 from Constants import GRID_DIMENSIONS, SLOT_DIMENSIONS
 from Collections.Grid import Grid
-from GameObjects.Card import CardController
+from GameObjects.Card.Card import CardController
 from GameObjects.GameObject import GameObject
 from GameObjects.Slot import SlotController, SlotUnavailableError
 import pygame as p

@@ -1,6 +1,6 @@
 import pygame
 from Constants import CARD_DIMENSIONS
-from GameObjects.Card import create_card_controller
+from Utils.UCard import create_card_controller
 from PModels import PlayerType
 from States.State import State
 from UI.Label import Label

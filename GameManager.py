@@ -7,13 +7,13 @@ from Bot import Bot
 from Constants import CARD_PLAYED_SHOW_TIME
 from Game import Game
 from GameObjects.Board import Board
-from GameObjects.Card import (
+from GameObjects.Card.Card import (
     Card,
     CardController,
     CardControllerBase,
-    ChangeStructureCardController,
-    SpellCardController,
 )
+from GameObjects.Card.SpellCard import SpellCardController
+from GameObjects.Card.ChangeStructureCard import ChangeStructureCardController
 from GameObjects.Database import CARD_DATABASE
 from GameObjects.Deck import DeckController
 from GameObjects.EffectContext import EffectContext
@@ -99,7 +99,8 @@ class GameManager(GameObject):
                 self.deck_me.add_card(random.choice(list(CARD_DATABASE.values())))
                 self.deck_op.add_card(CARD_DATABASE["goth_girl"])
             self.deck_me.add_card(CARD_DATABASE["frobenius"])
-            self.deck_me.add_card(CARD_DATABASE["goth_girl"])
+            self.deck_me.add_card(CARD_DATABASE["galois"])
+            self.deck_me.add_card(CARD_DATABASE["isomorphism"])
             for i in range(5):
                 self.hand_me.add_card(
                     self.deck_me.get_and_remove_top_card(), bg_image="BG2.png"

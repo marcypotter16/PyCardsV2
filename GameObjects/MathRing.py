@@ -3,7 +3,7 @@ import math
 import os
 
 import pygame
-from Constants import ART_PATH, CARD_TWEEN_DUR
+from Constants import ART_PATH, CARD_TWEEN_DUR, CARD_DIMENSIONS
 from Game import Game
 from GameObjects.GameObject import GameObject
 from GameObjects.SpriteRenderer import SpriteRenderer
@@ -112,6 +112,14 @@ class Ring(AdditiveGroup):
     def __str__(self):
         return self.name
 
+    def __eq__(self, other):
+        if not isinstance(other, Ring):
+            return False
+        return self.ring == other.ring
+
+    def __hash__(self):
+        return hash(self.ring)
+
 
 RING_DISPLAY = {
     Rings.Z: "ℤ",
@@ -138,9 +146,17 @@ class Zn(Ring):
     def __str__(self):
         return f"ℤ/{self.n}ℤ"
 
+    def __eq__(self, other):
+        if not isinstance(other, Zn):
+            return False
+        return self.n == other.n
+
+    def __hash__(self):
+        return hash(("Zn", self.n))
+
 
 class UnitsGroup(MultiplicativeGroup):
-    def __init__(self, ring: Ring):
+    def __init__(self, ring: Zn):
         super().__init__(f"U({ring})")
         self.base_ring = ring
         self.elements = ring.units()
@@ -157,6 +173,21 @@ class AutomorphismGroup(MultiplicativeGroup):
         else:
             self.elements = []
 
+    def __eq__(self, other):
+        if not isinstance(other, AutomorphismGroup):
+            return False
+        return self.base_structure == other.base_structure
+
+    def __hash__(self):
+        return hash(("Aut", self.base_structure))
+
+
+MAX_MODULUS = 20
+ISOMORPHISMS: dict[AlgebraicStructure, AlgebraicStructure] = {
+    AutomorphismGroup(Ring(Rings.Z)): Zn(2),
+}
+for i in range(2, MAX_MODULUS):
+    ISOMORPHISMS[AutomorphismGroup(Zn(i))] = UnitsGroup(Zn(i))
 
 ring2sprite = {
     Rings.Q: pygame.image.load(os.path.join(ART_PATH, "Q.png")),
@@ -187,6 +218,7 @@ def render_structure_with_ops(
     color: pygame.Color = pygame.Color("black"),
     font_size: int = 24,
     spacing: int = 8,
+    max_width: int | None = None,
 ) -> pygame.Surface:
     """Render an algebraic structure with its operations.
 
@@ -200,69 +232,129 @@ def render_structure_with_ops(
         color: Text color
         font_size: Base font size
         spacing: Horizontal spacing between elements
+        max_width: Maximum width in pixels. If text exceeds this, font size is reduced.
 
     Returns:
         A pygame surface with the rendered structure and operations
     """
-    font = game.get_font(font_group, font_size)
-
     # Get the display components
     structure_name = str(structure)
     operations = structure.get_operations()
 
-    # Render structure name
-    name_surf = font.render(structure_name, True, color)
+    # Try rendering at current font size, reduce if too wide
+    current_font_size = font_size
+    min_font_size = 8
 
+    while current_font_size >= min_font_size:
+        font = game.get_font(font_group, current_font_size)
+        current_spacing = int(spacing * current_font_size / font_size)
+
+        # Render structure name
+        name_surf = font.render(structure_name, True, color)
+
+        if not operations:
+            if max_width is None or name_surf.get_width() <= max_width:
+                return name_surf
+            current_font_size -= 2
+            continue
+
+        # Render comma and operations
+        comma_surf = font.render(",", True, color)
+        op_surfs = [font.render(op, True, color) for op in operations]
+
+        # Calculate total width
+        total_width = name_surf.get_width()
+        total_width += comma_surf.get_width() + current_spacing
+
+        for i, op_surf in enumerate(op_surfs):
+            total_width += op_surf.get_width()
+            if i < len(op_surfs) - 1:
+                total_width += comma_surf.get_width() + current_spacing
+
+        # Check if it fits
+        if max_width is not None and total_width > max_width:
+            current_font_size -= 2
+            continue
+
+        # Get max height
+        max_height = max(
+            name_surf.get_height(),
+            comma_surf.get_height(),
+            max(s.get_height() for s in op_surfs) if op_surfs else 0,
+        )
+
+        # Create final surface
+        surface = pygame.Surface((total_width, max_height), pygame.SRCALPHA)
+        surface.fill((0, 0, 0, 0))
+
+        # Blit elements
+        x = 0
+
+        # Structure name
+        y = (max_height - name_surf.get_height()) // 2
+        surface.blit(name_surf, (x, y))
+        x += name_surf.get_width()
+
+        # First comma
+        y = (max_height - comma_surf.get_height()) // 2
+        surface.blit(comma_surf, (x, y))
+        x += comma_surf.get_width() + current_spacing
+
+        # Operations with commas between them
+        for i, op_surf in enumerate(op_surfs):
+            y = (max_height - op_surf.get_height()) // 2
+            surface.blit(op_surf, (x, y))
+            x += op_surf.get_width()
+
+            if i < len(op_surfs) - 1:
+                y = (max_height - comma_surf.get_height()) // 2
+                surface.blit(comma_surf, (x, y))
+                x += comma_surf.get_width() + current_spacing
+
+        return surface
+
+    # If we got here, render at minimum font size anyway
+    font = game.get_font(font_group, min_font_size)
+    name_surf = font.render(structure_name, True, color)
     if not operations:
         return name_surf
 
-    # Render comma and operations
     comma_surf = font.render(",", True, color)
     op_surfs = [font.render(op, True, color) for op in operations]
+    current_spacing = int(spacing * min_font_size / font_size)
 
-    # Calculate total width
-    total_width = name_surf.get_width()
-    total_width += comma_surf.get_width() + spacing  # First comma after name
-
+    total_width = name_surf.get_width() + comma_surf.get_width() + current_spacing
     for i, op_surf in enumerate(op_surfs):
         total_width += op_surf.get_width()
         if i < len(op_surfs) - 1:
-            total_width += comma_surf.get_width() + spacing  # Comma between ops
+            total_width += comma_surf.get_width() + current_spacing
 
-    # Get max height
     max_height = max(
         name_surf.get_height(),
         comma_surf.get_height(),
         max(s.get_height() for s in op_surfs) if op_surfs else 0,
     )
 
-    # Create final surface
     surface = pygame.Surface((total_width, max_height), pygame.SRCALPHA)
     surface.fill((0, 0, 0, 0))
 
-    # Blit elements
     x = 0
-
-    # Structure name
     y = (max_height - name_surf.get_height()) // 2
     surface.blit(name_surf, (x, y))
     x += name_surf.get_width()
 
-    # First comma
     y = (max_height - comma_surf.get_height()) // 2
     surface.blit(comma_surf, (x, y))
-    x += comma_surf.get_width() + spacing
+    x += comma_surf.get_width() + current_spacing
 
-    # Operations with commas between them
     for i, op_surf in enumerate(op_surfs):
         y = (max_height - op_surf.get_height()) // 2
         surface.blit(op_surf, (x, y))
         x += op_surf.get_width()
-
         if i < len(op_surfs) - 1:
             y = (max_height - comma_surf.get_height()) // 2
             surface.blit(comma_surf, (x, y))
-            x += comma_surf.get_width() + spacing
+            x += comma_surf.get_width() + current_spacing
 
     return surface
 
@@ -404,12 +496,18 @@ class StructureController(GameObject):
     For example: "U(Z/5Z), ·" or "ZZ, +, ·"
     """
 
+    # Max width as ratio of card width
+    MAX_WIDTH_RATIO = 0.85
+
     def __init__(self, game, parent=None, initial_scale=1.0):
         super().__init__(game, parent)
         self.structure: AlgebraicStructure = None
-        self.used_font = "ant"
+        self.used_font = "stix"
         self.color = pygame.Color("black")
-        self.font_size = int(24 * initial_scale)
+        self.base_font_size = 24  # Base font size at scale 1.0
+        self.font_size = int(self.base_font_size * initial_scale)
+        self.current_scale = initial_scale
+        self.max_width = int(CARD_DIMENSIONS.x * self.MAX_WIDTH_RATIO * initial_scale)
 
         # Main sprite for the entire structure display
         self.structure_sprite = SpriteRenderer(self)
@@ -431,23 +529,35 @@ class StructureController(GameObject):
             structure: Any AlgebraicStructure (Ring, Zn, UnitsGroup, AutomorphismGroup, etc.)
             font_family: Font to use for rendering
             color: Text color
-            font_size: Base font size
         """
         self.structure = structure
         self.used_font = font_family
         self.color = color
 
+        self._render_at_current_scale()
+
+    def _render_at_current_scale(self):
+        """Re-render the structure at the current scale for crisp quality"""
+        if self.structure is None:
+            return
+
+        # Calculate font size and max width for current scale
+        self.font_size = int(self.base_font_size * self.current_scale)
+        if self.font_size < 8:
+            self.font_size = 8
+        self.max_width = int(CARD_DIMENSIONS.x * self.MAX_WIDTH_RATIO * self.current_scale)
+
         # Render the structure with its operations
         surf = render_structure_with_ops(
-            structure,
+            self.structure,
             self.game,
-            font_group=font_family,
-            color=color,
+            font_group=self.used_font,
+            color=self.color,
             font_size=self.font_size,
+            max_width=self.max_width,
         )
 
         self.structure_sprite.set_sprite_no_scale(surf)
-        self.structure_sprite.apply_scale()
 
     def is_domain(self) -> bool:
         return self.structure.is_domain()
@@ -455,7 +565,7 @@ class StructureController(GameObject):
     def set_color(self, new_color: pygame.Color):
         self.color = new_color
         if self.structure:
-            self.set_structure(self.structure, self.used_font, new_color)
+            self._render_at_current_scale()
 
     def scale_by(self, factor):
         super().scale_by(factor)
@@ -470,7 +580,12 @@ class StructureController(GameObject):
         if target_position is None:
             target_position = self.structure_sprite.transform.position
 
-        self.structure_sprite.tween_scale_to(new_scale)
+        def on_scale_done():
+            # Re-render at final scale for crisp quality
+            self.current_scale = new_scale
+            self._render_at_current_scale()
+
+        self.structure_sprite.tween_scale_to(new_scale / self.current_scale)
         self.structure_sprite.tween_pos(target_position)
 
         self.game.tweener_manager.add_tween(
@@ -478,6 +593,7 @@ class StructureController(GameObject):
             "scale",
             to_=new_scale,
             duration=self.structure_sprite.TWEEN_DUR,
+            on_finish=on_scale_done,
         )
 
 
