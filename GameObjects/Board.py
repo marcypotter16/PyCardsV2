@@ -14,6 +14,7 @@ class Board(GameObject):
         self.n_rows, self.n_cols = GRID_DIMENSIONS
         self.grid = Grid[SlotController](GRID_DIMENSIONS[0], GRID_DIMENSIONS[1])
         self.cards: list[UnitCardController] = []
+        self.slot_padding = p.Vector2(10, 10)
         self._init_grid()
 
     def move_center(self, new_center: p.Vector2):
@@ -26,10 +27,17 @@ class Board(GameObject):
         for row in range(self.n_rows):
             for col in range(self.n_cols):
                 slot = SlotController(self.game, self)
-                slot.move((col * SLOT_DIMENSIONS[0], row * SLOT_DIMENSIONS[1]))
+                slot.move(
+                    (
+                        col * (SLOT_DIMENSIONS[0] + self.slot_padding.x),
+                        row * (SLOT_DIMENSIONS[1] + self.slot_padding.y),
+                    )
+                )
                 offset = p.Vector2(
-                    SLOT_DIMENSIONS[0] * math.floor(self.n_cols * 0.5),
-                    SLOT_DIMENSIONS[1] * math.floor(self.n_rows * 0.5),
+                    (SLOT_DIMENSIONS[0] + self.slot_padding.x)
+                    * math.floor(self.n_cols * 0.5),
+                    (SLOT_DIMENSIONS[1] + self.slot_padding.y)
+                    * math.floor(self.n_rows * 0.5),
                 )
                 slot.move(slot.transform.position - offset)
                 self.grid.insert(slot, row, col)
@@ -37,6 +45,10 @@ class Board(GameObject):
         print(f"center coords: {self.center_coords}")
         self.center_slot = self.grid.get(self.center_coords[0], self.center_coords[1])
         print(self.center_slot)
+
+    def set_slots_visible(self, visible: bool):
+        for slot in self.grid.flatten():
+            slot.is_visible = visible
 
     def can_play_card(self, card: CardControllerBase, row: int, col: int) -> bool:
         return (

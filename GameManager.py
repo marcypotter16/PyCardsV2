@@ -1,10 +1,11 @@
 from enum import StrEnum
+import os
 import random
 from threading import Timer
 import time
 from typing import Dict, List
 from Bot import Bot
-from Constants import CARD_PLAYED_SHOW_TIME, TIME_BETWEEN_PLAY_AND_END_TURN
+from Constants import ART_PATH, CARD_PLAYED_SHOW_TIME, TIME_BETWEEN_PLAY_AND_END_TURN
 from Game import Game
 from GameObjects.Board import Board
 from GameObjects.Card.CardRenderer import CardRenderer
@@ -51,7 +52,12 @@ class GameManager(GameObject):
         self.players = players
         self.active_player_index = 0  # TODO: this is obviously temporary
         self.game.tweener_manager.set_tween_motion_method(EasingType.EASE_OUT_QUAD)
+        self.bg_sprite = SpriteRenderer(
+            self, os.path.join(ART_PATH, "blackboard1.png"), scale_img_to_dim=False
+        )
+        self.bg_sprite.move_percent(0.5, 0.5)
         self.board = Board(game, self)
+        self.board.set_slots_visible(False)
         self.hand_me = HandController(
             self.game,
             self,
@@ -373,9 +379,11 @@ class GameManager(GameObject):
         if self.game.clicked_sx == 1:
             if self.hand_me.rect.collidepoint(self.game.cursorpos):
                 self.hand_me_handle_click_sx(dt)
+                self.board.set_slots_visible(True)
         if self.game.clicked_sx == -1:
             if self.dragged_card is not None:
                 self.process_card_release()
+                self.board.set_slots_visible(False)
             elif self.deck_me.rect.collidepoint(self.game.cursorpos):
                 self.process_deck_left_click()
         if self.game.clicked_dx == -1:
