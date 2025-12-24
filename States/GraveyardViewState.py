@@ -1,6 +1,6 @@
 import pygame
 from Constants import CARD_DIMENSIONS
-from Utils.UCard import create_card_controller
+from GameObjects.Card.Card import CardControllerBase
 from PModels import PlayerType
 from States.State import State
 from UI.Label import Label
@@ -24,12 +24,13 @@ class GraveyardViewState(State):
     ):
         super().__init__(game, data, layer, bg_color, previous_state)
 
-        # Get dead cards from data
-        self.cards = data.get("cards", []) if data else []
-        self.cards_go = [
-            create_card_controller(self.game, card, self, bg_image="BG2.png")
-            for card in self.cards
-        ]
+        # Get dead cards from data (now CardControllerBase instances)
+        self.cards_go: list[CardControllerBase] = data.get("cards", []) if data else []
+        # Store original positions and make visible for viewing
+        self._original_positions: list[pygame.Vector2] = []
+        for card in self.cards_go:
+            self._original_positions.append(pygame.Vector2(card.transform.position))
+            card.is_visible = True
 
         # Title label
         self.title_label = Label(
@@ -105,3 +106,11 @@ class GraveyardViewState(State):
         super().update(delta)
         for card in self.cards_go:
             card.update(delta)
+
+    def exit_state(self):
+        """Restore card positions and visibility when leaving graveyard view."""
+        for i, card in enumerate(self.cards_go):
+            card.is_visible = False
+            if i < len(self._original_positions):
+                card.move(self._original_positions[i])
+        super().exit_state()

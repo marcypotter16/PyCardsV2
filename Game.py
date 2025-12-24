@@ -1,10 +1,9 @@
-import math
-from numpy import array
 import os
 from typing import Dict
 
 import moderngl
 
+from GLRenderer import GLRenderer
 from Resolution import set_dpi_awareness
 from Settings import GameSettings
 from SocketManager import SocketManager
@@ -14,7 +13,6 @@ set_dpi_awareness()
 
 import pygame as p
 
-# import pygame_shaders as ps
 import time
 
 from Collections.Stack import Stack
@@ -22,12 +20,10 @@ from Tween.Tween import TweenManager
 from Utils.Text import draw_centered_text
 
 
-# TODO: Shaders
 class Game:
     def __init__(self, workdir: str = os.getcwd(), use_shaders: bool = False):
         self.need_key_event_handling = True
         self.events = None
-        # self.fps: int = 120
         self.clock = p.time.Clock()
         self.font_dir = None
         self.assets_dir = None
@@ -42,72 +38,33 @@ class Game:
         file = open(os.path.join(os.getcwd(), "settings.json"), "r")
         self.settings = GameSettings.from_json(file.read())
         p.mouse.set_visible(self.settings.MOUSE_VISIBLE)
-        # p.mouse.set_cursor(p.cursors.diamond)
+
         self.GAME_W, self.GAME_H = 1920, 1080
         self.GAME_SCREEN_RATIO = (
-            int(
-                float(self.GAME_W) / self.settings.SCREEN_W,
-            ),
+            int(float(self.GAME_W) / self.settings.SCREEN_W),
             int(float(self.GAME_H) / self.settings.SCREEN_H),
         )
         self.GAME_CENTER = (self.GAME_W / 2, self.GAME_H / 2)
         self.game_canvas = p.Surface((self.GAME_W, self.GAME_H))
-        # self.screen = p.display.set_mode(
-        #     (self.settings.SCREEN_W, self.settings.SCREEN_H), p.RESIZABLE
-        # )
+
         self.screen = p.display.set_mode(
             (self.settings.SCREEN_W, self.settings.SCREEN_H),
             p.RESIZABLE | p.OPENGL | p.DOUBLEBUF,
             vsync=0,
         )
 
-        # ModernGL
+        # Initialize OpenGL renderer
         self.glctx = moderngl.create_context()
-        self.glctx.enable(moderngl.BLEND)
-        self.glctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
-        self.game_texture = self.glctx.texture((self.GAME_W, self.GAME_H), 4)
-        self.game_texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
-        self.game_texture.repeat_x = False
-        self.game_texture.repeat_y = False
-        self.game_to_screen_scale: int
-        self.screen_to_game_scale: int
-        quad = array(
-            [
-                # x,  y,   u, v
-                -1.0,
-                -1.0,
-                0.0,
-                0.0,
-                1.0,
-                -1.0,
-                1.0,
-                0.0,
-                -1.0,
-                1.0,
-                0.0,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-            ],
-            dtype="f4",
-        )
+        self.gl_renderer = GLRenderer(self.glctx, (self.GAME_W, self.GAME_H))
 
-        self.vbo = self.glctx.buffer(quad.tobytes())
-        wspath = os.path.join(workdir, "window_scaling.glsl")
-        wsfrag = os.path.join(workdir, "window_scaling_frag.glsl")
-        with open(wspath, "r", encoding="utf-8") as f:
-            vertex_src = f.read()
+        # Scaling values (updated by _recompute_scaling)
+        self.game_to_screen_scale: float = 1.0
+        self.screen_to_game_scale: float = 1.0
+        self.scaled_size: tuple[int, int] = (self.GAME_W, self.GAME_H)
+        self.game_canvas_offset: tuple[int, int] = (0, 0)
 
-        with open(wsfrag, "r", encoding="utf-8") as f:
-            fragment_src = f.read()
-
-        prog = self.glctx.program(
-            vertex_shader=vertex_src,
-            fragment_shader=fragment_src,
-        )
-        self.vao = self.glctx.simple_vertex_array(prog, self.vbo, "in_pos", "in_uv")
+        # Post-render callbacks for GPU effects (called after main canvas render, before flip)
+        self.post_render_callbacks: list[callable] = []
 
         self._recompute_scaling()
         self.running, self.playing = True, True
@@ -224,29 +181,14 @@ class Game:
         # print(self.jump_action_changed)
 
     def _recompute_scaling(self):
-        scale_x = self.settings.SCREEN_W / self.GAME_W
-        scale_y = self.settings.SCREEN_H / self.GAME_H
-        self.game_to_screen_scale = min(scale_x, scale_y)
-        self.screen_to_game_scale = 1 / self.game_to_screen_scale
-
-        self.scaled_size = (
-            int(self.GAME_W * self.game_to_screen_scale),
-            int(self.GAME_H * self.game_to_screen_scale),
+        """Recompute scaling values and update GL viewport."""
+        scaling_info = self.gl_renderer.set_viewport(
+            self.settings.SCREEN_W, self.settings.SCREEN_H
         )
-
-        self.game_canvas_offset = (
-            (self.settings.SCREEN_W - self.scaled_size[0]) // 2,
-            (self.settings.SCREEN_H - self.scaled_size[1]) // 2,
-        )
-
-        # Set OpenGL viewport for letterboxing (y is from bottom in OpenGL)
-        viewport_y = self.settings.SCREEN_H - self.game_canvas_offset[1] - self.scaled_size[1]
-        self.glctx.viewport = (
-            self.game_canvas_offset[0],
-            viewport_y,
-            self.scaled_size[0],
-            self.scaled_size[1],
-        )
+        self.game_to_screen_scale = scaling_info["game_to_screen_scale"]
+        self.screen_to_game_scale = scaling_info["screen_to_game_scale"]
+        self.scaled_size = scaling_info["scaled_size"]
+        self.game_canvas_offset = scaling_info["offset"]
 
     def update(self):
         # Convert screen mouse position to game coordinates, accounting for letterbox
@@ -277,21 +219,13 @@ class Game:
             p.draw.circle(self.game_canvas, p.Color("white"), self.cursorpos, 5)
             p.draw.circle(self.game_canvas, p.Color("black"), self.cursorpos, 8, 2)
 
-        # scale GAME → SCREEN
-        # p.transform.smoothscale(
-        #     self.game_canvas, self.scaled_size, self.scaled_game_canvas
-        # )
+        # Upload game canvas to GPU and render
+        self.gl_renderer.upload_surface(self.game_canvas)
+        self.gl_renderer.render()
 
-        # GPU scaling attempt 1
-        self.game_texture.write(p.image.tobytes(self.game_canvas, "RGBA", True))
-        self.glctx.clear(0.0, 0.0, 0.0, 1.0)
-        self.game_texture.use(0)
-        self.vao.render(moderngl.TRIANGLE_STRIP)
-
-        # present
-        # self.screen.fill(self.settings.LETTERBOX_COLOR)  # letterbox bars
-        # # self.screen.blit(self.scaled_game_canvas, self.game_canvas_offset)
-        # self.screen.blit(self.game_canvas, self.game_canvas_offset)
+        # GPU post-processing effects (buff sheen, etc.)
+        for callback in self.post_render_callbacks:
+            callback()
 
         p.display.flip()
 

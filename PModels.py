@@ -78,8 +78,7 @@ class GameState(BaseModel):
     turn_count: int
     cards_in_hand_me: list[PCardModel]
     cards_in_board: list[tuple[PCardModel, tuple[int, int]]]  # [(a card, coordinates)]
-    cards_in_gy_me: list[PCardModel]
-    cards_in_gy_op: list[PCardModel]
+    cards_in_gy: list[PCardModel]
     cards_in_deck_me: list[PCardModel]
     active_structure: str
 

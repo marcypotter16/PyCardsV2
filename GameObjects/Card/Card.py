@@ -75,6 +75,9 @@ class Card(BaseCard):
 class CardControllerBase(GameObject):
     """Base class for all card controllers (regular cards and spell cards)"""
 
+    # Hover offset interpolation speed (0-1, higher = faster)
+    HOVER_LERP_SPEED = 0.25
+
     def __init__(
         self, game, parent=None, card_model: BaseCard | None = None, font_family="stix"
     ):
@@ -90,6 +93,69 @@ class CardControllerBase(GameObject):
         self.base_sprite = None
         self.rect = None
         self.font_family = font_family
+        self.z_index = 0
+        self._should_buff = False
+        self.buff_time = 0.0
+        self.buff_duration = 0.6
+
+        # Hover offset - visual only, doesn't affect actual position
+        self.hover_offset = p.Vector2(0, 0)
+        self.target_hover_offset = p.Vector2(0, 0)
+
+    @property
+    def buff_in_progress(self) -> bool:
+        """Returns True if the buff effect is currently active."""
+        return self.buff_time < self.buff_duration and self._should_buff
+
+    def update(self, delta):
+        """Update hover offset interpolation and rect position"""
+        # Lerp hover offset toward target
+        self.hover_offset = self.hover_offset.lerp(
+            self.target_hover_offset, self.HOVER_LERP_SPEED
+        )
+
+        # Update children first (sets their rect.center from transform.position)
+        super().update(delta)
+
+        # Apply hover offset to own rect (for collision detection)
+        if self.rect is not None:
+            self.rect.center = self.transform.position + self.hover_offset
+
+        # Apply hover offset to all descendant rects for visual rendering
+        self._apply_hover_offset_recursive(self.children, self.hover_offset)
+        if self.buff_in_progress:
+            self.buff_time += delta
+        else:
+            self.buff_time = 0.0
+            self._should_buff = False
+
+    def _apply_hover_offset_recursive(self, children, offset):
+        """Recursively apply hover offset to all descendants' rects"""
+        for c in children:
+            if hasattr(c, "rect") and c.rect is not None:
+                c.rect.center = c.transform.position + offset
+            # Recurse into grandchildren
+            if hasattr(c, "children") and c.children:
+                self._apply_hover_offset_recursive(c.children, offset)
+
+    def set_hover(self, is_hovered: bool, hover_amount: float = 0.5):
+        """Set hover state with visual offset
+
+        Args:
+            is_hovered: Whether the card is being hovered
+            hover_amount: How much to offset (as ratio of card height, default 0.5)
+        """
+        self.hovered = is_hovered
+        if is_hovered and self.rect is not None:
+            self.target_hover_offset = p.Vector2(0, -self.rect.h * hover_amount)
+        else:
+            self.target_hover_offset = p.Vector2(0, 0)
+
+    def clear_hover_instant(self):
+        """Instantly clear hover offset (no animation)"""
+        self.hovered = False
+        self.hover_offset = p.Vector2(0, 0)
+        self.target_hover_offset = p.Vector2(0, 0)
 
     def from_card(self, card):
         """Override in subclasses"""
@@ -171,7 +237,9 @@ class CardControllerBase(GameObject):
         )
 
 
-class CardController(CardControllerBase):
+class UnitCardController(CardControllerBase):
+    """Controller for unit cards that have power values and art"""
+
     # Diamond size as ratio of card width
     DIAMOND_SIZE_RATIO = 0.35
 
@@ -257,6 +325,8 @@ class CardController(CardControllerBase):
         self.power_text_surf = self.game.get_font(
             self.font_family, self.power_text_font_size
         ).render(str(new_power), True, color)
+        if new_power > self.current_power:
+            self.start_buff_anim()
         self.current_power = new_power
         self.card_model.current_power = new_power
         self.power_text_sprite.set_sprite_no_scale(self.power_text_surf)
@@ -306,7 +376,7 @@ class CardController(CardControllerBase):
             self.art_sprite.set_sprite(p.image.load(self.art_path))
         else:
             placeholder = p.Surface((int(CARD_DIMENSIONS.x), int(CARD_DIMENSIONS.y)))
-            placeholder_color = p.Color("pink")
+            placeholder_color = p.Color("darkblue")
             placeholder.fill(placeholder_color)
             self.art_sprite.set_sprite(placeholder)
 
@@ -374,16 +444,12 @@ class CardController(CardControllerBase):
         scaled_power_offset = self.power_text_offset * new_scale
         self.power_text_sprite.tween_pos(self.transform.position + scaled_power_offset)
 
+    def start_buff_anim(self):
+        self._should_buff = True
+
     def render(self, surface):
         p.draw.rect(surface, p.Color("white"), self.rect, width=1, border_radius=4)
         super().render(surface)
-        # p.draw.circle(
-        #     surface,
-        #     p.Color("white"),
-        #     self.power_text_sprite.rect.center,
-        #     self.power_circle_radius,
-        #     width=1,
-        # )
 
     def update(self, delta):
         super().update(delta)

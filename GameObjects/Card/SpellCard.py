@@ -39,8 +39,8 @@ class SpellCardController(CardControllerBase):
         # Text rendering surfaces and sprites
         self.name_text_surf = None
         self.name_text_sprite = None
-        self.description_text_surf = None
-        self.description_text_sprite = None
+        # self.description_text_surf = None
+        # self.description_text_sprite = None
 
         # Track last rendered scale to detect changes
         self.last_text_scale = 1.0
@@ -95,44 +95,8 @@ class SpellCardController(CardControllerBase):
             self.name_text_sprite.set_dim(name_sprite_dimensions)
 
         # Position name at top of card (both for initial creation and updates)
-        name_offset = p.Vector2(0, -CARD_DIMENSIONS.y * 0.3 * scale)
+        name_offset = p.Vector2(0, -CARD_DIMENSIONS.y * 0.2 * scale)
         self.name_text_sprite.move(self.transform.position + name_offset)
-
-        # Target width for description (70% of card width at this scale)
-        target_desc_width = CARD_DIMENSIONS.x * 0.7 * scale
-
-        # Use centralized render_multiline_text method
-        self.description_text_surf = self.game.render_multiline_text(
-            self.description,
-            font_name=self.font_family,
-            color=(0, 0, 0),
-            max_width=int(target_desc_width),
-            base_font_size=int(5 * scale),
-        )
-
-        # Use actual surface size - no rescaling needed!
-        desc_sprite_dimensions = self.description_text_surf.get_size()
-
-        # Create or update description sprite
-        if self.description_text_sprite is None:
-            self.description_text_sprite = SpriteRenderer(
-                self,
-                self.description_text_surf,
-                dimensions=desc_sprite_dimensions,
-            )
-            self.description_text_sprite.TWEEN_DUR = CARD_TWEEN_DUR
-        else:
-            # Update existing sprite
-            self.description_text_sprite.set_sprite(self.description_text_surf)
-            self.description_text_sprite.set_dim(desc_sprite_dimensions)
-
-        # Position description below the name (both for initial creation and updates)
-        self.sep_rect = p.Rect(
-            self.name_text_sprite.rect.bottomleft,
-            (self.name_text_sprite.dimensions[0], 2),
-        )
-        desc_offset = p.Vector2(0, self.name_text_sprite.dimensions[1] * 0.5)
-        self.description_text_sprite.move(self.sep_rect.center + desc_offset)
 
         # Update last rendered scale
         self.last_text_scale = scale
@@ -146,13 +110,13 @@ class SpellCardController(CardControllerBase):
             # (tween manager may have killed our tween)
             return
 
-        # Check if scale has changed significantly - if so, re-render text for quality
-        current_scale = self.transform.scale
-        scale_diff = abs(current_scale - self.last_text_scale)
+        # # Check if scale has changed significantly - if so, re-render text for quality
+        # current_scale = self.transform.scale
+        # scale_diff = abs(current_scale - self.last_text_scale)
 
-        # Re-render if scale changed by more than 0.1 (prevents constant re-rendering)
-        if scale_diff > 0.1:
-            self._render_text_at_scale(current_scale)
+        # # Re-render if scale changed by more than 0.1 (prevents constant re-rendering)
+        # if scale_diff > 0.1:
+        #     self._render_text_at_scale(current_scale)
 
     # TODO: unstable method!
     def tween_scale_to(self, new_scale, target_card_position=None):
@@ -196,19 +160,16 @@ class SpellCardController(CardControllerBase):
             self.name_text_sprite.tween_pos(name_target)
             self.name_text_sprite.tween_scale_to(scale_ratio)
 
-        if (
-            self.description_text_sprite is not None
-            and self.name_text_sprite is not None
-        ):
-            # Calculate target position for description (below name)
-            name_offset = p.Vector2(0, -CARD_DIMENSIONS.y * 0.3 * new_scale)
-            name_target = target_card_position + name_offset
-            # Estimate description position based on scaled name dimensions
-            scaled_name_height = self.name_text_sprite.dimensions[1] * scale_ratio
-            desc_offset = p.Vector2(0, scaled_name_height * 1.5)
-            desc_target = name_target + desc_offset
-            self.description_text_sprite.tween_pos(desc_target)
-            self.description_text_sprite.tween_scale_to(scale_ratio)
+    def tween_pos_and_scale(self, new_pos, new_scale, drop=True, on_finish=None):
+        super().tween_pos_and_scale(new_pos, new_scale, drop, on_finish)
+        new_pos = p.Vector2(new_pos)
+        self.base_sprite.tween_pos(new_pos)
+        self.name_text_sprite.tween_pos(
+            p.Vector2(new_pos)
+            + self.name_text_sprite.transform.position
+            - self.transform.position
+        )
+        self.tween_scale_to(new_scale)
 
     def render(self, surface):
         super().render(surface)

@@ -228,17 +228,18 @@ class SpriteRenderer(GameObject):
 
     def update(self, delta: float):
         if self.__is_rotating or self.__is_scaling:
-            self.sprite = p.transform.rotozoom(
-                self.__o_sprite, self.transform.rotation, self.transform.scale
-            )
-            self.rect.size = p.Vector2(self.__o_dimensions) * self.transform.scale
-            self.rect.center = self.transform.position
+            if self.__o_sprite is not None:
+                self.sprite = p.transform.rotozoom(
+                    self.__o_sprite, self.transform.rotation, self.transform.scale
+                )
+                self.rect.size = p.Vector2(self.__o_dimensions) * self.transform.scale
+                self.rect.center = self.transform.position
         if self.__is_moving:
             self.rect.center = self.transform.position
         self.position = p.Vector2(self.rect.center)
 
         # MB - Check if sprite has moved enough to warrant motion blur
-        if self.mb["active"]:
+        if self.mb["active"] and self.sprite:
             # Calculate distance moved since last frame
             distance_moved = self.position.distance_to(self.__last_frame_position)
 

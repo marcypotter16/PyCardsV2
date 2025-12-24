@@ -105,6 +105,9 @@ class Ring(AdditiveGroup):
     def is_field(self) -> bool:
         return self.name is Rings.Q
 
+    def units(self) -> list:
+        pass
+
     @property
     def name(self):
         return RING_DISPLAY[self.ring]
@@ -156,7 +159,7 @@ class Zn(Ring):
 
 
 class UnitsGroup(MultiplicativeGroup):
-    def __init__(self, ring: Zn):
+    def __init__(self, ring: Zn | Ring):
         super().__init__(f"U({ring})")
         self.base_ring = ring
         self.elements = ring.units()
@@ -182,11 +185,12 @@ class AutomorphismGroup(MultiplicativeGroup):
         return hash(("Aut", self.base_structure))
 
 
-MAX_MODULUS = 20
+MODULI = [7, 11, 21, 33, 37]
 ISOMORPHISMS: dict[AlgebraicStructure, AlgebraicStructure] = {
     AutomorphismGroup(Ring(Rings.Z)): Zn(2),
+    UnitsGroup(Ring(Rings.Z)): Zn(2),
 }
-for i in range(2, MAX_MODULUS):
+for i in range(2, max(MODULI)):
     ISOMORPHISMS[AutomorphismGroup(Zn(i))] = UnitsGroup(Zn(i))
 
 ring2sprite = {
@@ -499,7 +503,7 @@ class StructureController(GameObject):
     # Max width as ratio of card width
     MAX_WIDTH_RATIO = 0.85
 
-    def __init__(self, game, parent=None, initial_scale=1.0):
+    def __init__(self, game, parent=None, initial_scale=1.0, render_with_ops=True):
         super().__init__(game, parent)
         self.structure: AlgebraicStructure = None
         self.used_font = "stix"
@@ -512,6 +516,7 @@ class StructureController(GameObject):
         # Main sprite for the entire structure display
         self.structure_sprite = SpriteRenderer(self)
         self.structure_sprite.TWEEN_DUR = CARD_TWEEN_DUR
+        self.render_with_ops = render_with_ops
 
         # Scale down to fit on cards
         if initial_scale != 1.0:
@@ -545,22 +550,55 @@ class StructureController(GameObject):
         self.font_size = int(self.base_font_size * self.current_scale)
         if self.font_size < 8:
             self.font_size = 8
-        self.max_width = int(CARD_DIMENSIONS.x * self.MAX_WIDTH_RATIO * self.current_scale)
+        self.max_width = int(
+            CARD_DIMENSIONS.x * self.MAX_WIDTH_RATIO * self.current_scale
+        )
 
         # Render the structure with its operations
-        surf = render_structure_with_ops(
-            self.structure,
-            self.game,
-            font_group=self.used_font,
-            color=self.color,
-            font_size=self.font_size,
-            max_width=self.max_width,
-        )
+        if self.render_with_ops:
+            surf = render_structure_with_ops(
+                self.structure,
+                self.game,
+                font_group=self.used_font,
+                color=self.color,
+                font_size=self.font_size,
+                max_width=self.max_width,
+            )
+        else:
+            surf = self.game.get_font(self.used_font, self.font_size).render(
+                str(self.structure), True, self.color
+            )
 
         self.structure_sprite.set_sprite_no_scale(surf)
 
     def is_domain(self) -> bool:
         return self.structure.is_domain()
+
+    def is_ring(self) -> bool:
+        return isinstance(self.structure, Ring)
+
+    def is_finite_ring(self) -> bool:
+        return isinstance(self.structure, Zn)
+
+    def is_infinite(self) -> bool:
+        return (
+            not isinstance(self.structure, Zn)
+            and not (
+                isinstance(self.structure, AutomorphismGroup)
+                and (
+                    isinstance(self.structure.base_structure, Zn)
+                    or self.structure.base_structure
+                    == Ring(Rings.Z)  # Automorphisms of Z are Z/2Z
+                )
+            )
+            and not (
+                isinstance(self.structure, UnitsGroup)
+                and (
+                    isinstance(self.structure.base_ring, Zn)
+                    or self.structure.base_ring == Ring(Rings.Z)
+                )
+            )
+        )
 
     def set_color(self, new_color: pygame.Color):
         self.color = new_color

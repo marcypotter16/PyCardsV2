@@ -3,10 +3,11 @@ import pygame as p
 
 # SCALING_FACTOR = 100
 SCALING_FACTOR = 40
-CARD_DIMENSIONS = SCALING_FACTOR * p.Vector2(2.5, 3.5)
+CARD_DIMENSIONS = SCALING_FACTOR * p.Vector2(2, 3)
 CARD_ART_SIZE_RATIO = 0.7
 CARD_TWEEN_DUR = 0.3
 CARD_PLAYED_SHOW_TIME = 1.0
+TIME_BETWEEN_PLAY_AND_END_TURN = 1.0
 
 SLOT_DIMENSIONS = CARD_DIMENSIONS * 1.1
 
@@ -54,3 +55,10 @@ def get_create_room_addr(p_name: str, local: bool = False) -> str:
     if local:
         return WS_CREATE_ROOM_ADDR_LOCAL + f"{p_name}"
     return WS_CREATE_ROOM_ADDR + f"{p_name}"
+
+
+SPECIAL_CHARACTERS = {
+    "ZZ": "ℤ",
+    "QQ": "ℚ",
+    "iso": "≅",
+}

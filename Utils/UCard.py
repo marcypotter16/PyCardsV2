@@ -1,4 +1,4 @@
-from GameObjects.Card.Card import Card, CardController, CardControllerBase
+from GameObjects.Card.Card import Card, CardControllerBase, UnitCardController
 from GameObjects.Card.ChangeStructureCard import (
     ChangeStructureCard,
     ChangeStructureCardController,
@@ -21,7 +21,7 @@ def create_card_controller(
         Appropriate CardController subclass for the card type
     """
     if isinstance(card, Card):
-        controller = CardController(game, parent)
+        controller = UnitCardController(game, parent)
     elif isinstance(card, ChangeStructureCard):
         controller = ChangeStructureCardController(game, parent, bg_image)
     elif isinstance(card, SpellCard):

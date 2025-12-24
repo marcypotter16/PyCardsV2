@@ -20,7 +20,6 @@ from PModels import PlayerType
 
 
 def on_change_structure_card_play(ctx: "EffectContext"):
-    ctx.game_state.active_structure = ctx.source_card.card_model.structure
     ctx.game_manager.structure.set_structure(
         ctx.source_card.card_model.structure, color=ctx.game_manager.structure.color
     )
@@ -74,7 +73,10 @@ class ChangeStructureCardController(CardControllerBase):
         )
         self.initial_structure_scale = 1.0
         self.structure_controller = StructureController(
-            game, self, initial_scale=self.initial_structure_scale
+            game,
+            self,
+            initial_scale=self.initial_structure_scale,
+            render_with_ops=False,
         )
         self.structure_offset = p.Vector2(0, -0.18 * CARD_DIMENSIONS[1])
 

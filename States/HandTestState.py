@@ -1,4 +1,4 @@
-from GameObjects.Card.Card import CardController
+from GameObjects.Card.Card import UnitCardController
 from GameObjects.Hand import HandController
 from States.State import State
 from Utils.Timer import SpacedCallback
@@ -13,7 +13,7 @@ class HandTestState(State):
         self.game.timer_manager.add_timer(spaced_call)
 
     def spawn_and_add_card_to_hand(self):
-        c = CardController(self.game)
+        c = UnitCardController(self.game)
         self.hand.add_card(c)
 
     def update(self, delta_time):

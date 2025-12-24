@@ -3,7 +3,7 @@ from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from GameManager import GameManager
-    from GameObjects.Card.Card import CardController
+    from GameObjects.Card.Card import CardControllerBase
     from GameObjects.Board import Board
     from GameObjects.Slot import SlotController
     from PModels import GameState
@@ -16,22 +16,19 @@ class EffectContext:
     Effects can use whichever fields are relevant to them.
     """
 
-    game_state: "GameState"
-    source_card: "CardController"
-    board: "Board"
-    game_manager: Optional["GameManager"]
+    source_card: "CardControllerBase"
+    game_manager: "GameManager"
 
     # Position-related (for on_play, positional effects)
     row: Optional[int] = None
     col: Optional[int] = None
-    slot: Optional["SlotController"] = None
 
     # Neighbors (computed on demand or passed in)
     neighbours: Optional[List["SlotController"]] = None
 
     # Target-related (for targeted effects, combat)
-    target_card: Optional["CardController"] = None
-    target_cards: Optional[List["CardController"]] = None
+    target_card: Optional["CardControllerBase"] = None
+    target_cards: Optional[List["CardControllerBase"]] = None
 
     # Additional context
     trigger: Optional[str] = None  # e.g., "on_play", "on_death", "on_turn_start"
@@ -41,13 +38,17 @@ class EffectContext:
         if self.neighbours is not None:
             return self.neighbours
 
-        if self.row is not None and self.col is not None and self.board is not None:
-            self.neighbours = self.board.get_neighbours(self.row, self.col)
+        if (
+            self.row is not None
+            and self.col is not None
+            and self.game_manager.board is not None
+        ):
+            self.neighbours = self.game_manager.board.get_neighbours(self.row, self.col)
             return self.neighbours
 
         return []
 
-    def get_neighbour_cards(self) -> List["CardController"]:
+    def get_neighbour_cards(self) -> List["CardControllerBase"]:
         """Get all cards in neighbouring slots."""
         neighbour_cards = []
         for slot in self.get_neighbours():

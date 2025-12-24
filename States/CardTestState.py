@@ -7,7 +7,7 @@ from GameObjects.MathRing import Rings, Zn
 from GameObjects.Slot import SlotController
 from GameObjects.Card.Card import (
     Card,
-    CardController,
+    UnitCardController,
 )
 from GameObjects.Card.SpellCard import SpellCardController
 from GameObjects.Card.ChangeStructureCard import ChangeStructureCardController
@@ -27,7 +27,7 @@ class CardTestState(State):
         # Timer(lambda: self.slot.add_card(self.card2), 2)
 
     def from_card(self, card: Card):
-        self.card = CardController(self.game)
+        self.card = UnitCardController(self.game)
         self.card2 = SpellCardController(self.game)
         self.card.move(p.Vector2(200, 200))
         self.card2.move(self.game.GAME_CENTER)

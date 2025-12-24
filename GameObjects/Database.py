@@ -7,12 +7,13 @@ import os
 
 from GameObjects.MathRing import (
     ISOMORPHISMS,
-    MAX_MODULUS,
+    MODULI,
     AutomorphismGroup,
     Ring,
     Rings,
     Zn,
 )
+from PModels import PlayerType
 
 # print(ART_PATH)
 
@@ -52,14 +53,19 @@ def mvn_trigger(ctx: EffectContext):
 
 
 def plus_1_on_play(ctx: EffectContext):
-    if isinstance(ctx.game_manager.structure, Zn):
+    # print(ctx.game_manager.structure, isinstance(ctx.game_manager.structure, Zn))
+    if isinstance(ctx.game_manager.structure.structure, Zn):
         ctx.game_manager.structure.set_structure(
-            Zn(ctx.game_manager.structure.ring.n + 1)
+            Zn(ctx.game_manager.structure.structure.n + 1),
+            color=ctx.game_manager.structure.color,
         )
 
 
 def frobenius_on_play(ctx: EffectContext):
-    if ctx.game_manager.structure.is_domain():
+    if (
+        ctx.game_manager.structure.is_finite_ring()
+        and ctx.game_manager.structure.is_domain()
+    ):
         ctx.source_card.change_power(ctx.source_card.current_power * 2)
 
 
@@ -85,6 +91,20 @@ def iso_on_play(ctx: EffectContext):
             ISOMORPHISMS[ctx.game_manager.structure.structure],
             color=ctx.game_manager.structure.color,
         )
+
+
+def frob_first_student_on_turn_end(ctx: EffectContext):
+    if (
+        ctx.game_manager.structure.is_finite_ring()
+        and ctx.game_manager.structure.is_domain()
+        and ctx.game_manager.active_player == PlayerType.ME
+    ):
+        ctx.source_card.change_power(ctx.source_card.current_power + 1)
+
+
+def cantor_on_play(ctx: EffectContext):
+    if ctx.game_manager.structure.is_infinite():
+        ctx.game_manager.hand_me.add_controller(ctx.game_manager.deck_me.draw_card())
 
 
 CARD_DATABASE = {
@@ -124,7 +144,24 @@ CARD_DATABASE = {
         os.path.join(ART_PATH, "Galois.png"),
         tags=[CardTag.HUMAN, CardTag.SCIENCE],
         effects={"on_play": [galois_on_play]},
-        description="Change the Current Active Structure R to Aut(R), its group of automorphisms. (HANDLE WITH CARE)",
+        description="Change the Current Active Structure R to Aut(R), its group of group automorphisms (if R is a Ring or a Field we still consider Group morphism). (HANDLE WITH CARE)",
+        base_power=1,
+    ),
+    "frobenius_first_student": Card(
+        "Frobenius First Student",
+        None,
+        tags=[CardTag.HUMAN, CardTag.SCIENCE],
+        effects={"on_turn_end": [frob_first_student_on_turn_end]},
+        description="Gains 1 power at the end of your turn if the current active structure is a finite ring and its Frobenius endomorphism is injective",
+        base_power=2,
+    ),
+    "cantor": Card(
+        "Cantor",
+        None,
+        tags=[CardTag.HUMAN, CardTag.SCIENCE],
+        effects={"on_play": [cantor_on_play]},
+        description="If the current active structure is infinite, draw a card",
+        base_power=3,
     ),
     "isomorphism": SpellCard(
         "≅",
@@ -133,7 +170,7 @@ CARD_DATABASE = {
         description="If possible use a canonical isomorphism to change the current active structure",
     ),
 }
-for i in range(2, MAX_MODULUS):
+for i in MODULI:
     CARD_DATABASE[f"Z{i}"] = ChangeStructureCard(Zn(i))
 
 
@@ -156,7 +193,7 @@ if __name__ == "__main__":
     # Need to create a minimal Game mock for testing
     from unittest.mock import MagicMock
     from GameObjects.Board import Board
-    from GameObjects.Card.Card import CardController
+    from GameObjects.Card.Card import UnitCardController
 
     # Initialize pygame for font rendering
     import pygame
@@ -178,13 +215,13 @@ if __name__ == "__main__":
     # Create two MvN card controllers
     mvn_card = CARD_DATABASE["goth_girl"]
 
-    card1 = CardController(mock_game)
+    card1 = UnitCardController(mock_game)
     card1.from_card(mvn_card)
     print(
         f"Card 1 created: {card1.name}, base_power={card1.base_power}, current_power={card1.current_power}"
     )
 
-    card2 = CardController(mock_game)
+    card2 = UnitCardController(mock_game)
     card2.from_card(mvn_card)
     print(
         f"Card 2 created: {card2.name}, base_power={card2.base_power}, current_power={card2.current_power}\n"

@@ -55,6 +55,11 @@ class Stack(Generic[T]):
             self.elements.pop(-1)
             self.elements.insert(0, obj)
 
+    def remove(self, obj: T) -> None:
+        if obj in self.elements:
+            self.elements.remove(obj)
+            self.__size -= 1
+
     def is_empty(self) -> bool:
         """
         Returns true if the stack is empty

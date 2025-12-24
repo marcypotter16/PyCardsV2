@@ -2,7 +2,7 @@ import math
 from typing import List
 from Constants import GRID_DIMENSIONS, SLOT_DIMENSIONS
 from Collections.Grid import Grid
-from GameObjects.Card.Card import CardController
+from GameObjects.Card.Card import CardControllerBase, UnitCardController
 from GameObjects.GameObject import GameObject
 from GameObjects.Slot import SlotController, SlotUnavailableError
 import pygame as p
@@ -13,7 +13,7 @@ class Board(GameObject):
         super().__init__(game, parent, pivot)
         self.n_rows, self.n_cols = GRID_DIMENSIONS
         self.grid = Grid[SlotController](GRID_DIMENSIONS[0], GRID_DIMENSIONS[1])
-        self.cards: list[CardController] = []
+        self.cards: list[UnitCardController] = []
         self._init_grid()
 
     def move_center(self, new_center: p.Vector2):
@@ -27,36 +27,25 @@ class Board(GameObject):
             for col in range(self.n_cols):
                 slot = SlotController(self.game, self)
                 slot.move((col * SLOT_DIMENSIONS[0], row * SLOT_DIMENSIONS[1]))
-                # slot.move(
-                #     slot.transform.position
-                #     - 0.5
-                #     * p.Vector2(
-                #         SLOT_DIMENSIONS[0] * self.n_rows,
-                #         SLOT_DIMENSIONS[1] * self.n_cols,
-                #     )
-                # )
-                # Centering
-                # print(math.floor(self.n_cols * 0.5), math.floor(self.n_rows * 0.5))
                 offset = p.Vector2(
                     SLOT_DIMENSIONS[0] * math.floor(self.n_cols * 0.5),
                     SLOT_DIMENSIONS[1] * math.floor(self.n_rows * 0.5),
                 )
                 slot.move(slot.transform.position - offset)
                 self.grid.insert(slot, row, col)
-                # self.grid.insert(row + col, row, col)
         self.center_coords = (int(self.n_rows / 2), int(self.n_cols / 2))
         print(f"center coords: {self.center_coords}")
         self.center_slot = self.grid.get(self.center_coords[0], self.center_coords[1])
         print(self.center_slot)
 
-    def can_play_card(self, card: CardController, row: int, col: int) -> bool:
+    def can_play_card(self, card: CardControllerBase, row: int, col: int) -> bool:
         return (
             row <= self.n_rows
             and col <= self.n_cols
             and self.grid.get(row, col).can_add_card(card)
         )
 
-    def play_card(self, card: CardController, row: int, col: int) -> bool:
+    def play_card(self, card: CardControllerBase, row: int, col: int) -> bool:
         try:
             self.grid.get(row, col).add_card(card)
             self.cards.append(card)

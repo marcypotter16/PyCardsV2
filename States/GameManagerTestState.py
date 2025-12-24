@@ -2,7 +2,7 @@ import os
 import pygame
 from Bot import Bot
 from Constants import ART_PATH, UI_PATH
-from GameManager import GameManager
+from GameManager import GameManager, TurnState
 from PModels import Player, PlayerType
 from SocketManager import SocketManager
 from States.HistoryViewState import HistoryViewState
@@ -115,9 +115,19 @@ class OfflineGameManagerTestState(State):
         )
 
     def state_machine(self):
-        if self.gm.active_player == PlayerType.OP:
+        if (
+            self.gm.active_player == PlayerType.OP
+            and self.gm.turn_state == TurnState.WAITING_FOR_INPUT
+        ):
             card, row, col = self.bot.think(self.gm.board)
-            self.gm.play_op_card(card, row, col)
+            if card is not None:
+                self.gm.play_op_card(card, row, col)
+            elif self.gm.deck_op.card_count > 0:
+                # Bot can't play, draw a card instead
+                drawn = self.gm.deck_op.draw_card()
+                drawn.flip()
+                self.gm.hand_op.add_controller(drawn)
+                self.gm.end_turn()
 
     def update(self, delta_time):
         super().update(delta_time)
@@ -125,9 +135,9 @@ class OfflineGameManagerTestState(State):
         self.state_machine()
         self.turn_info_label.set_text(f"Turn Count: {self.gm.turn_count}")
         self.turn_info_label2.set_text(f"Active player: {self.gm.active_player}")
-        self.debug_label.set_text(
-            f"mouse: {(100*float(self.game.cursorpos[0])/self.game.GAME_W):.2f}%, {(100*float(self.game.cursorpos[1])/self.game.GAME_H):.2f}%"
-        )
+        # self.debug_label.set_text(
+        #     f"mouse: {(100*float(self.game.cursorpos[0])/self.game.GAME_W):.2f}%, {(100*float(self.game.cursorpos[1])/self.game.GAME_H):.2f}%"
+        # )
 
     def render(self, surface):
         super().render(surface)

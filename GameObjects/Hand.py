@@ -24,6 +24,10 @@ class HandModel:
             raise HandFullError
         self.cards.push(c)
 
+    def remove(self, card: Card):
+        if card in self.cards.elements:
+            self.cards.remove(card)
+
 
 class HandController(GameObject):
     def __init__(
@@ -55,11 +59,39 @@ class HandController(GameObject):
         self.hand_model.add_card(c)
         c_go = create_card_controller(self.game, c, self, bg_image)
         self.cards.append(c_go)
+        self._expand_rect()
+        self.reorder()
+
+    def add_controller(self, card: CardControllerBase):
+        """Add an existing card controller to the hand.
+
+        Use this when drawing cards from deck, since the deck already stores controllers.
+        """
+        self.hand_model.add_card(card.card_model)
+        card.parent = self
+        card.owner = self.owner
+        self.cards.append(card)
+        self._expand_rect()
+        self.reorder()
+
+    def remove_card(self, card: CardControllerBase):
+        self.cards.remove(card)
+        self.hand_model.remove(card.card_model)
+        self._shrink_rect()
+
+    def _expand_rect(self):
+        """Expand the hand rect to accommodate another card."""
         r = self.rect.copy()
         r.width += CARD_DIMENSIONS[0] + self.distance_between_cards
         r.center = self.rect.center
         self.rect = r
-        self.reorder()
+
+    def _shrink_rect(self):
+        """Shrink the hand rect when a card is removed."""
+        r = self.rect.copy()
+        r.width = max(self.distance_between_cards, r.width - CARD_DIMENSIONS[0] - self.distance_between_cards)
+        r.center = self.rect.center
+        self.rect = r
 
     def reorder(self):
         x0 = (
@@ -82,8 +114,9 @@ class HandController(GameObject):
 
     def render(self, surface):
         p.draw.rect(surface, (255, 255, 0), self.rect, 2, 2)
-        self.cards.sort(key=lambda c: c.hovered)
-        for c in self.cards:
-            c.render(surface)
+        # CARD RENDERING MOVED TO CARDRENDERER
+        # self.cards.sort(key=lambda c: c.hovered)
+        # for c in self.cards:
+        #     c.render(surface)
         # p.draw.circle(surface, (0, 255, 0), self.rect.center, 10)
         # p.draw.circle(surface, (255, 0, 0), self.transform.position, 10)

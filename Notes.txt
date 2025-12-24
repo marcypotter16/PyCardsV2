@@ -1,0 +1,3 @@
+Game (or a round) lasts a fixed number of turns, let's say 20. Each turn you have the options of playing a card or drawing one from deck.
+
+The Automorphism group should take in account the type of morphisms we are working with (maybe)

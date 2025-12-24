@@ -1,6 +1,6 @@
 from Constants import COLORS, SLOT_DIMENSIONS
 from Game import Game
-from GameObjects.Card.Card import CardController
+from GameObjects.Card.Card import CardControllerBase
 from GameObjects.GameObject import GameObject
 from GameObjects.Card.Card import Card
 import pygame as p
@@ -38,10 +38,10 @@ class SlotController(GameObject):
         super().move(new_position)
         self.rect.center = self.transform.position
 
-    def can_add_card(self, c: CardController) -> bool:
+    def can_add_card(self, c: CardControllerBase) -> bool:
         return self.available and self.content is None
 
-    def add_card(self, c: CardController):
+    def add_card(self, c: CardControllerBase):
         if not self.available:
             raise SlotUnavailableError
         if self.content is not None:

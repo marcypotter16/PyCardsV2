@@ -1,3 +1,5 @@
+from Constants import SPECIAL_CHARACTERS
+from GameObjects.Card.Card import BaseCard
 from Utils.UCard import create_card_controller
 from GameObjects.Database import CARD_DATABASE
 from States.State import State
@@ -15,7 +17,7 @@ class CardDetailedView(State):
         game,
         data: object | None = None,
         layer="foreground",
-        card=CARD_DATABASE["goth_girl"],
+        card: BaseCard = CARD_DATABASE["goth_girl"],
     ):
         super().__init__(game, data, layer)
         self.card_data = card
@@ -28,20 +30,20 @@ class CardDetailedView(State):
             bg_image=bg_img,
         )
         # self.card.scale_by(0)
-        self.card.move((self.game.GAME_W * 0.25, self.game.GAME_H * 0.5))
         self.target_scale = 2.0
-        self.font = self.game.fonts["october_crow"]["medium"]
-        # self.text_surf = p.Surface(
-        #     (self.game.GAME_W * 0.7, self.game.GAME_H * 0.9), p.SRCALPHA
-        # )
-        # self.text_alpha = 0
-        # self.text_color = (255, 255, 255)
-        # self.anim_dur = 2
-        # # self.text_surf = self.text_surf.convert_alpha()
-        # self.game.tweener_manager.add_tween(
-        #     self, "text_alpha", to_=255, duration=self.anim_dur
-        # )
-        self.card.tween_scale_to(self.target_scale)
+        print(
+            card.name,
+            SPECIAL_CHARACTERS.values(),
+            card.name in SPECIAL_CHARACTERS.values(),
+        )
+        self.name_font = (
+            self.game.fonts["october_crow"]["big"]
+            if card.name not in SPECIAL_CHARACTERS.values()
+            else self.game.get_font("stix", 60)
+        )
+        self.card.tween_pos_and_scale(
+            (self.game.GAME_W * 0.25, self.game.GAME_H * 0.5), self.target_scale
+        )
         # self.go_back_btn = TextButton(
         #     self.canvas,
         #     center=(self.game.GAME_W - 30, 15),
@@ -76,7 +78,7 @@ class CardDetailedView(State):
             height=r.h,
             fg_color=(255, 255, 255),
             text=self.card_data.name,
-            font=self.game.fonts["october_crow"]["big"],
+            font=self.name_font,
         )
 
         # Card description - rendered with ant font, half of GAME_W width
