@@ -53,7 +53,9 @@ class GameManager(GameObject):
         self.active_player_index = 0  # TODO: this is obviously temporary
         self.game.tweener_manager.set_tween_motion_method(EasingType.EASE_OUT_QUAD)
         self.bg_sprite = SpriteRenderer(
-            self, os.path.join(ART_PATH, "blackboard1.png"), scale_img_to_dim=False
+            self,
+            os.path.join(ART_PATH, "blackboard1.png"),
+            dimensions=(int(game.GAME_W * 0.95), int(game.GAME_H * 0.95)),
         )
         self.bg_sprite.move_percent(0.5, 0.5)
         self.board = Board(game, self)
